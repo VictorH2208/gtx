@@ -34,8 +34,8 @@ def get_arg_parser():
     parser.add_argument('--decayRate', type=float, default=0.3, help='Learning rate decay factor')
 
     # Scaling parameters
-    parser.add_argument('--scaleFL', type=float, default=1e4, help='Scaling factor for fluorescence')
-    parser.add_argument('--scaleOP0', type=float, default=100, help='Scaling for absorption coefficient (μa)')
+    parser.add_argument('--scaleFL', type=float, default=10e4, help='Scaling factor for fluorescence')
+    parser.add_argument('--scaleOP0', type=float, default=10, help='Scaling for absorption coefficient (μa)')
     parser.add_argument('--scaleOP1', type=float, default=1, help='Scaling for scattering coefficient (μs\')')
     parser.add_argument('--scaleDF', type=float, default=1, help='Scaling for depth')
     parser.add_argument('--scaleQF', type=float, default=1, help='Scaling for fluorophore concentration')
