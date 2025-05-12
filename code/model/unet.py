@@ -6,20 +6,48 @@ import torch.nn.functional as F
 class AttentionGate(nn.Module):
     def __init__(self, in_g, in_s, inter_channels):
         super(AttentionGate, self).__init__()
-        self.Wg = nn.Conv2d(in_g, inter_channels, kernel_size=1, stride=2)
-        self.Ws = nn.Conv2d(in_s, inter_channels, kernel_size=1)
-        self.psi = nn.Conv2d(inter_channels, 1, kernel_size=1)
+        # self.Wg = nn.Conv2d(in_g, inter_channels, kernel_size=1, stride=2)
+        # self.Ws = nn.Conv2d(in_s, inter_channels, kernel_size=1)
+        # self.psi = nn.Conv2d(inter_channels, 1, kernel_size=1)
+
+        self.Wg = nn.Sequential(
+            nn.Conv2d(in_g, inter_channels, kernel_size=1, stride=2, padding=0, bias=True),
+            nn.BatchNorm2d(inter_channels),
+        )
+
+        self.Ws = nn.Sequential(
+            nn.Conv2d(in_s, inter_channels, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(inter_channels),
+        )
+
+        self.psi = nn.Sequential(
+            nn.Conv2d(inter_channels, 1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(1),
+            nn.Sigmoid()
+        )
+
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, g, s):
-        Wg = self.Wg(g)
+        # Wg = self.Wg(g)
+        # s = F.interpolate(s, size=Wg.shape[2:], mode='bilinear', align_corners=False)
+        # Ws = self.Ws(s)
+        # out = F.relu(Wg + Ws)
+        # out = self.psi(out)
+        # out = torch.sigmoid(out)
+        # out = F.interpolate(out, size=g.shape[2:], mode='bilinear', align_corners=False)
+        # return out * g
 
-        s = F.interpolate(s, size=Wg.shape[2:], mode='bilinear', align_corners=False)
-        Ws = self.Ws(s)
-        out = F.relu(Wg + Ws)
-        out = self.psi(out)
-        out = torch.sigmoid(out)
-        out = F.interpolate(out, size=g.shape[2:], mode='bilinear', align_corners=False)
-        return out * g
+        g1 = self.Wg(g)
+        s1 = self.Ws(s)
+
+        if g1.shape[2:] != s1.shape[2:]:
+            s1 = F.interpolate(s1, size=g1.shape[2:], mode='bilinear', align_corners=False)
+
+        x = self.relu(g1 + s1)
+        x = self.psi(x)
+        x_up = F.interpolate(x, size=g.shape[2:], mode='bilinear', align_corners=False)
+        return g * x_up
     
 class UnetModel(nn.Module):
     def __init__(self, params):

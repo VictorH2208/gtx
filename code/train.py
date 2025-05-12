@@ -32,6 +32,7 @@ def get_arg_parser():
     parser.add_argument('--xX', type=int, default=101, help='Image width')
     parser.add_argument('--yY', type=int, default=101, help='Image height')
     parser.add_argument('--decayRate', type=float, default=0.3, help='Learning rate decay factor')
+    parser.add_argument('--patience', type=int, default=20, help='Early stopping patience')
 
     # Scaling parameters
     parser.add_argument('--scaleFL', type=float, default=10e4, help='Scaling factor for fluorescence')
@@ -84,19 +85,20 @@ def train(params):
     print("Dataset split into train and validation sets")
 
     # Init DataLoader
-    train_loader = DataLoader(train_dataset, batch_size=params['batch'], shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=params['batch'], shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=params['batch'], shuffle=True, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=params['batch'], shuffle=False, num_workers=4)
 
     best_val_loss = float('inf')
     patience_counter = 0
 
     # Training loop
-    for epoch in tqdm(range(params['epochs']), desc="Training"):
+    for epoch in range(params['epochs']):
         print(f"Epoch {epoch + 1}/{params['epochs']}")
         model.train()
         train_loss = []
         for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(train_loader):
-            print(f"Batch {batch_idx + 1}/{len(train_loader)}")
+            if (batch_idx + 1) % 50 == 0:
+                print(f"Train Batch {batch_idx + 1}/{len(train_loader)}")
             fluorescence, mu_a, mu_s, concentration_fluor, depth = fluorescence.to(DEVICE), mu_a.to(DEVICE), mu_s.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
             fluorescence = fluorescence.unsqueeze(1)
             op = torch.cat([mu_a, mu_s], dim=1)
@@ -116,8 +118,8 @@ def train(params):
         val_loss = []
         with torch.no_grad():
             for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(val_loader):
-                print(f"Batch {batch_idx + 1}/{len(val_loader)}")
                 fluorescence, mu_a, mu_s, concentration_fluor, depth = fluorescence.to(DEVICE), mu_a.to(DEVICE), mu_s.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
+                fluorescence = fluorescence.unsqueeze(1)
                 op = torch.cat([mu_a, mu_s], dim=1)
                 pred_qf, pred_depth = model(op, fluorescence)
                 loss_qf = mse_loss(pred_qf, concentration_fluor)
@@ -148,6 +150,15 @@ def train(params):
 if __name__ == "__main__":
     parser = get_arg_parser()
     args = parser.parse_args()
-
     params = vars(args)
-    train(params)
+
+    np.random.seed(1024)
+    torch.manual_seed(1024)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(1024)
+    torch.backends.cudnn.deterministic = True
+
+    try:
+        train(params)
+    except KeyboardInterrupt:
+        print("Training interrupted by user")
