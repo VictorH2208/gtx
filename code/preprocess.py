@@ -40,5 +40,5 @@ def load_data(file_path, scale_params):
         'mu_s': mu_s_norm,
         'concentration_fluor': concentration_fluor
         }, scale_params)
-    
+    print("Data loaded and scaled")
     return scaled_data_dict

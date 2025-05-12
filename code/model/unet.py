@@ -12,6 +12,8 @@ class AttentionGate(nn.Module):
 
     def forward(self, g, s):
         Wg = self.Wg(g)
+
+        s = F.interpolate(s, size=Wg.shape[2:], mode='bilinear', align_corners=False)
         Ws = self.Ws(s)
         out = F.relu(Wg + Ws)
         out = self.psi(out)
@@ -77,42 +79,42 @@ class UnetModel(nn.Module):
         )
 
         # Attention Gates
-        self.att1 = AttentionGate(1024, 512, 512)
-        self.att2 = AttentionGate(512, 256, 256)
-        self.att3 = AttentionGate(256, nf2d + nf3d * params['nF'], 128)
+        self.att1 = AttentionGate(512, 1024, 512)
+        self.att2 = AttentionGate(256, 512, 256)
+        self.att3 = AttentionGate(nf2d + nf3d * params['nF'], 256, 128)
 
         # Decoder
         self.up1 = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
-            nn.Conv2d(1024, 512, kernel_size=2, padding=1),
+            nn.Conv2d(1024, 512, kernel_size=3, padding=1),  # 'same' padding
             nn.ReLU()
         )
         self.conv_dec1 = nn.Sequential(
-            nn.Conv2d(1024, 512, kernel_size=params['kernelConv2D'], padding='same'),
+            nn.Conv2d(1024, 512, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(512, 512, kernel_size=params['kernelConv2D'], padding='same'),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
             nn.ReLU()
         )
 
         self.up2 = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
-            nn.Conv2d(512, 256, kernel_size=2, padding=1),
+            nn.Conv2d(512, 256, kernel_size=3, padding=1),
             nn.ReLU()
         )
         self.conv_dec2 = nn.Sequential(
-            nn.Conv2d(512, 256, kernel_size=params['kernelConv2D'], padding='same'),
+            nn.Conv2d(512, 256, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(256, 256, kernel_size=params['kernelConv2D'], padding='same'),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
             nn.ReLU()
         )
 
         self.up3 = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
-            nn.Conv2d(256, 128, kernel_size=2, padding=1),
+            nn.Conv2d(256, 128, kernel_size=3, padding=1),
             nn.ReLU()
         )
         self.conv_dec3 = nn.Sequential(
-            nn.Conv2d(256, 128, kernel_size=params['kernelConv2D'], padding='same'),
+            nn.Conv2d(576, 128, kernel_size=3, padding=1),  # 128 (upsample) + 448 (att3)
             nn.ReLU()
         )
 
@@ -143,21 +145,29 @@ class UnetModel(nn.Module):
         x2 = self.conv_post_2(self.pool(x1))
         x3 = self.conv_post_3(self.pool(x2))
 
-        att1 = self.att1(x3, x2)
+        att1 = self.att1(x2, x3)
         x = self.up1(x3)
+        att1 = F.interpolate(att1, size=x.shape[2:], mode='bilinear', align_corners=False)
         x = torch.cat([x, att1], dim=1)
         x = self.conv_dec1(x)
 
-        att2 = self.att2(x, x1)
+        att2 = self.att2(x1, x)
         x = self.up2(x)
+        att2 = F.interpolate(att2, size=x.shape[2:], mode='bilinear', align_corners=False)
         x = torch.cat([x, att2], dim=1)
         x = self.conv_dec2(x)
 
-        att3 = self.att3(x, x0)
+        att3 = self.att3(x0, x)
         x = self.up3(x)
+        att3 = F.interpolate(att3, size=x.shape[2:], mode='bilinear', align_corners=False)
         x = torch.cat([x, att3], dim=1)
         x = self.conv_dec3(x)
 
         qf = self.out_qf(x)
         df = self.out_df(x)
+
+        target_size = (self.params['xX'], self.params['yY'])  # Usually (101, 101)
+        qf = F.interpolate(qf, size=target_size, mode='bilinear', align_corners=False)
+        df = F.interpolate(df, size=target_size, mode='bilinear', align_corners=False)
+
         return qf, df

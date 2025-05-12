@@ -51,36 +51,56 @@ def get_arg_parser():
     parser.add_argument('--kernelConv2D', type=int, nargs=2, default=[3,3])
     parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
 
+    # Data path
+    parser.add_argument('--data_path', type=str, default='data/')
+
     return parser
 
 def train(params):
 
     # Initialize model
     model = UnetModel(params)
-
+    model.to(DEVICE)
+    
     # Initialize optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=params['learningRate'])
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=params['decayRate'], patience=5, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=params['decayRate'], patience=5)
     mse_loss = torch.nn.MSELoss()
     
     # Init Dataset
-    data = load_data(params['data_path'])
+    scale_params = {
+        'fluorescence': params['scaleFL'],
+        'mu_a': params['scaleOP0'],
+        'mu_s': params['scaleOP1'],
+        'depth': params['scaleDF'],
+        'concentration_fluor': params['scaleQF'],
+        'reflectance': params['scaleRE']
+    }
+    data = load_data(params['data_path'], scale_params)
     dataset = FluorescenceDataset(data)
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    print("Dataset split into train and validation sets")
 
     # Init DataLoader
     train_loader = DataLoader(train_dataset, batch_size=params['batch'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=params['batch'], shuffle=False)
 
+    best_val_loss = float('inf')
+    patience_counter = 0
+
     # Training loop
     for epoch in tqdm(range(params['epochs']), desc="Training"):
+        print(f"Epoch {epoch + 1}/{params['epochs']}")
         model.train()
         train_loss = []
         for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(train_loader):
+            print(f"Batch {batch_idx + 1}/{len(train_loader)}")
             fluorescence, mu_a, mu_s, concentration_fluor, depth = fluorescence.to(DEVICE), mu_a.to(DEVICE), mu_s.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
+            fluorescence = fluorescence.unsqueeze(1)
             op = torch.cat([mu_a, mu_s], dim=1)
+
             optimizer.zero_grad()
 
             pred_qf, pred_depth = model(op, fluorescence)
@@ -96,6 +116,7 @@ def train(params):
         val_loss = []
         with torch.no_grad():
             for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(val_loader):
+                print(f"Batch {batch_idx + 1}/{len(val_loader)}")
                 fluorescence, mu_a, mu_s, concentration_fluor, depth = fluorescence.to(DEVICE), mu_a.to(DEVICE), mu_s.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
                 op = torch.cat([mu_a, mu_s], dim=1)
                 pred_qf, pred_depth = model(op, fluorescence)
