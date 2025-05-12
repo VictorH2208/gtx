@@ -97,11 +97,17 @@ def train(params):
         model.train()
         train_loss = []
         for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(train_loader):
-            if (batch_idx + 1) % 50 == 0:
-                print(f"Train Batch {batch_idx + 1}/{len(train_loader)}")
-            fluorescence, mu_a, mu_s, concentration_fluor, depth = fluorescence.to(DEVICE), mu_a.to(DEVICE), mu_s.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
-            fluorescence = fluorescence.unsqueeze(1)
-            op = torch.cat([mu_a, mu_s], dim=1)
+
+            fluorescence = fluorescence.to(DEVICE).to(memory_format=torch.channels_last).unsqueeze(1)
+            mu_a = mu_a.to(DEVICE)
+            mu_s = mu_s.to(DEVICE)
+            concentration_fluor = concentration_fluor.to(DEVICE).to(memory_format=torch.channels_last)
+            depth = depth.to(DEVICE).to(memory_format=torch.channels_last)
+
+            op = torch.cat([mu_a, mu_s], dim=1).to(memory_format=torch.channels_last)
+
+            if epoch == 0 and batch_idx == 0:
+                print(fluorescence.shape, op.shape, concentration_fluor.shape, depth.shape)
 
             optimizer.zero_grad()
 
