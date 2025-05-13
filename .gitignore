@@ -2,4 +2,7 @@
 data/
 .DS_Store
 __pycache__/
-best_model.pth
+code_tf/ckpt/
+code_tf/logs/
+code_py/ckpt/
+code_py/logs/
