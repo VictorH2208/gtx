@@ -8,6 +8,9 @@ os.chdir(project_root)
 sys.path.insert(0, project_root)
 
 import logging
+logging.basicConfig(level=logging.INFO) 
+logger = logging.getLogger(__name__)
+
 import argparse
 import numpy as np
 from model import ModelInit
@@ -64,6 +67,12 @@ class BatchLogger(tf.keras.callbacks.Callback):
             loss = logs.get('loss')
             logging.info(f"[Batch {batch}] Loss: {loss:.4f}")
 
+    def on_epoch_end(self, epoch, logs=None):
+        logging.info(
+            f"Epoch {epoch}: "
+            + ", ".join([f"{k} = {v:.4f}" for k, v in logs.items() if isinstance(v, float)])
+        )
+
 def train(params):
 
     # Load data
@@ -95,8 +104,16 @@ def train(params):
     # Initialize optimizer
     lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=params['decayRate'], patience=5, verbose=1, min_lr=5e-5)
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=params['patience'], verbose=1, mode='auto')
-    batch_logger = BatchLogger(log_interval=50)
-    callbacks = [lr_scheduler, early_stopping, batch_logger]
+    batch_logger = BatchLogger(log_interval=20)
+    checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        filepath='code_tf/ckpt/model.h5',
+        monitor='val_loss',
+        save_best_only=True,
+        save_weights_only=False,
+        verbose=1
+    )
+    csv_logger = tf.keras.callbacks.CSVLogger('code_tf/logs/training.log', append=True)
+    callbacks = [lr_scheduler, early_stopping, batch_logger, checkpoint, csv_logger]
 
     # Train model
     model.model.fit([op, fluorescence], {'outQF': concentration_fluor, 'outDF': depth}, validation_split=0.2, batch_size=params['batch'], epochs=params['epochs'], verbose=0, shuffle=True, callbacks=callbacks)
