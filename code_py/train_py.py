@@ -1,3 +1,10 @@
+import os
+import sys
+
+project_root = '/home/victorh/projects/gtx'
+os.chdir(project_root)
+sys.path.insert(0, project_root)
+
 import argparse
 import numpy as np
 import torch
@@ -7,7 +14,7 @@ from tqdm import tqdm
 
 from model.unet import UnetModel
 from dataset import FluorescenceDataset
-from preprocess import load_data
+from utils.preprocess import load_data
 
 
 if torch.cuda.is_available():
@@ -77,6 +84,8 @@ def train(params):
         'concentration_fluor': params['scaleQF'],
         'reflectance': params['scaleRE']
     }
+
+    # Load data
     data = load_data(params['data_path'], scale_params)
     dataset = FluorescenceDataset(data)
     train_size = int(0.8 * len(dataset))
