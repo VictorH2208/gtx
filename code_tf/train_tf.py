@@ -7,6 +7,7 @@ project_root = '/home/victorh/projects/gtx'
 os.chdir(project_root)
 sys.path.insert(0, project_root)
 
+import logging
 import argparse
 import numpy as np
 from model import ModelInit
@@ -21,7 +22,7 @@ def get_arg_parser():
     # General hyperparameters
     parser.add_argument('--activation', type=str, default='relu', help='Activation function')
     parser.add_argument('--optimizer', type=str, default='Adam', help='Optimizer name')
-    parser.add_argument('--epochs', type=int, default=2, help='Number of training epochs')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of training epochs')
     parser.add_argument('--nF', type=int, default=6, help='Number of fluroescent spatial frequencies (fluorescent images)')
     parser.add_argument('--learningRate', type=float, default=5e-4, help='Learning rate')
     parser.add_argument('--batch', type=int, default=32, help='Batch size')
@@ -33,7 +34,7 @@ def get_arg_parser():
     # Scaling parameters
     parser.add_argument('--scaleFL', type=float, default=10e4, help='Scaling factor for fluorescence')
     parser.add_argument('--scaleOP0', type=float, default=10, help='Scaling for absorption coefficient (μa)')
-    parser.add_argument('--scaleOP1', type=float, default=1, help='Scaling for scattering coefficient (μs\')')
+    parser.add_argument('--scaleOP1', type=float, default=1, help='Scaling for scattering coefficient (μs)')
     parser.add_argument('--scaleDF', type=float, default=1, help='Scaling for depth')
     parser.add_argument('--scaleQF', type=float, default=1, help='Scaling for fluorophore concentration')
     parser.add_argument('--scaleRE', type=float, default=1, help='Scaling for reflectance (optional)')
@@ -52,6 +53,16 @@ def get_arg_parser():
     parser.add_argument('--data_path', type=str, default='data/')
 
     return parser
+
+class BatchLogger(tf.keras.callbacks.Callback):
+    def __init__(self, log_interval=50):
+        super().__init__()
+        self.log_interval = log_interval
+
+    def on_train_batch_end(self, batch, logs=None):
+        if batch % self.log_interval == 0:
+            loss = logs.get('loss')
+            logging.info(f"[Batch {batch}] Loss: {loss:.4f}")
 
 def train(params):
 
@@ -76,8 +87,6 @@ def train(params):
     print(fluorescence.shape)
     print(depth.shape)
     print(concentration_fluor.shape)
-    
-    return
 
     # Initialize model
     model = ModelInit(params)
@@ -86,16 +95,20 @@ def train(params):
     # Initialize optimizer
     lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=params['decayRate'], patience=5, verbose=1, min_lr=5e-5)
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=params['patience'], verbose=1, mode='auto')
-    callbacks = [lr_scheduler, early_stopping]
+    batch_logger = BatchLogger(log_interval=50)
+    callbacks = [lr_scheduler, early_stopping, batch_logger]
 
     # Train model
-    model.model.fit([op, fluorescence], [concentration_fluor, depth], validation_split=0.2, batch_size=params['batch'], epochs=params['epochs'], verbose=1, shuffle=True, callbacks=callbacks)
+    model.model.fit([op, fluorescence], {'outQF': concentration_fluor, 'outDF': depth}, validation_split=0.2, batch_size=params['batch'], epochs=params['epochs'], verbose=0, shuffle=True, callbacks=callbacks)
         
         
 if __name__ == "__main__":
     parser = get_arg_parser()
     args = parser.parse_args()
     params = vars(args)
+
+    np.random.seed(1024)
+    tf.random.set_seed(1024)
 
     train(params)
 

@@ -1,7 +1,7 @@
 
-from keras.models import Model, load_model
-from keras.layers import BatchNormalization, Input, concatenate, Conv2D, add, Conv3D, Reshape, SeparableConv2D, Dropout, MaxPool2D,MaxPool3D, UpSampling2D, ZeroPadding2D, Activation, ReLU
-from keras.preprocessing import image
+from keras.models import Model
+from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation
+from keras import metrics
 import keras
 
 class ModelInit():  
@@ -148,7 +148,7 @@ class ModelInit():
                         activation=self.params['activation'], data_format="channels_last")(outQF) #outQF
                 
                 outQF = Conv2D(filters=1, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                                data_format="channels_last")(outQF)
+                                data_format="channels_last", name='outQF')(outQF)
 
                 ## Depth Fluorescence Output Branch ##
                 #first DF layer 
@@ -159,15 +159,20 @@ class ModelInit():
                         activation=self.params['activation'], data_format="channels_last")(outDF)
                 
                 outDF = Conv2D(filters=1, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                        data_format="channels_last")(outDF)
+                        data_format="channels_last", name='outDF')(outDF)
 
                 ## Defining and compiling the model ##
 
                 self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outQF, outDF])
 
-                self.model.compile(loss=['mae', 'mae'],
-                        optimizer=getattr(keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
-                        metrics=['mae', 'mae'])
+                self.model.compile(
+                    loss={'outQF': 'mae', 'outDF': 'mae'},
+                    optimizer=getattr(keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
+                    metrics={
+                        'outQF': metrics.MeanAbsoluteError(name='mae_qf'),
+                        'outDF': metrics.MeanAbsoluteError(name='mae_df')
+                    }
+                )
                 
                 self.model.summary()
 

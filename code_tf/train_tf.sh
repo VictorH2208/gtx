@@ -6,7 +6,7 @@ set -e
 # === Configuration Variables ===
 ACTIVATION="relu"
 OPTIMIZER="Adam"
-EPOCHS=100
+EPOCHS=2
 NF=6
 LEARNING_RATE=5e-4
 BATCH_SIZE=20
