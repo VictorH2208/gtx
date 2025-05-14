@@ -3,9 +3,9 @@ import sys
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 0 = all logs, 1 = filter INFO, 2 = filter INFO+WARNING, 3 = only ERRORs
 
-project_root = '/home/victorh/projects/gtx'
-os.chdir(project_root)
-sys.path.insert(0, project_root)
+# project_root = '/home/victorh/projects/gtx'
+# os.chdir(project_root)
+# sys.path.insert(0, project_root)
 
 import logging
 logging.basicConfig(level=logging.INFO) 
@@ -22,6 +22,8 @@ from utils.preprocess import load_data
 
 def get_arg_parser():
     parser = argparse.ArgumentParser(description="Hyperparameter configuration for fluorescence imaging model.")
+
+    parser.add_argument('--sagemaker', type=bool, default=False, help='SageMaker mode')
 
     # General hyperparameters
     parser.add_argument('--activation', type=str, default='relu', help='Activation function')
@@ -55,7 +57,7 @@ def get_arg_parser():
 
     # Data path
     parser.add_argument('--data_path', type=str, default='data/')
-
+    parser.add_argument('--model_dir', type=str, default='code_tf/ckpt/')
     return parser
 
 class BatchLogger(tf.keras.callbacks.Callback):
@@ -85,7 +87,11 @@ def train(params):
         'concentration_fluor': params['scaleQF'],
         'reflectance': params['scaleRE']
     }
-    data = load_data(params['data_path'], scale_params)
+    if params['sagemaker']:
+        filepath = os.path.join('/opt/ml/input/data/training', 'nImages1000_new.mat')
+        data = load_data(filepath, scale_params)
+    else:
+        data = load_data(params['data_path'], scale_params)
 
     fluorescence = data['fluorescence']
     op = np.stack([data['mu_a'], data['mu_s']], axis=1)
@@ -106,15 +112,21 @@ def train(params):
     lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=params['decayRate'], patience=5, verbose=1, min_lr=5e-5)
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=params['patience'], verbose=1, mode='auto')
     batch_logger = BatchLogger(log_interval=20)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if params['sagemaker']:
+        model_dir = '/opt/ml/model'
+    else:
+        model_dir = params['model_dir']
+
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath='code_tf/ckpt/model.h5',
+        filepath=os.path.join(model_dir, f'model_ckpt_{timestamp}.h5'), 
         monitor='val_loss',
         save_best_only=True,
         save_weights_only=False,
         verbose=1
     )
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_logger = tf.keras.callbacks.CSVLogger(f'code_tf/logs/loss_{timestamp}.log', append=True)
+    csv_logger = tf.keras.callbacks.CSVLogger(os.path.join(model_dir, f'loss_{timestamp}.log'), append=True)
     callbacks = [lr_scheduler, early_stopping, batch_logger, checkpoint, csv_logger]
 
     # Train model
