@@ -113,18 +113,17 @@ def train(params):
         train_loss = []
         qf_loss = []
         depth_loss = []
-        for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(train_loader):
+        for batch_idx, (fluorescence, op, concentration_fluor, depth) in enumerate(train_loader):
 
             fluorescence = fluorescence.to(DEVICE)
-            op = torch.cat([mu_a.unsqueeze(1), mu_s.unsqueeze(1)], dim=1)
-            op = op.permute(0, 2, 3, 1).to(DEVICE)
+            op = op.to(DEVICE)
             concentration_fluor = concentration_fluor.to(DEVICE)
             depth = depth.to(DEVICE)
 
             if epoch == 0 and batch_idx == 0:
                 print(fluorescence.shape, op.shape, concentration_fluor.shape, depth.shape)
 
-            # return
+            return
 
             optimizer.zero_grad()
 
@@ -144,10 +143,8 @@ def train(params):
         val_qf_loss = []
         val_depth_loss = []
         with torch.no_grad():
-            for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(val_loader):
-                fluorescence, mu_a, mu_s, concentration_fluor, depth = fluorescence.to(DEVICE), mu_a.to(DEVICE), mu_s.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
-                fluorescence = fluorescence.unsqueeze(1)
-                op = torch.cat([mu_a, mu_s], dim=1)
+            for batch_idx, (fluorescence, op, concentration_fluor, depth) in enumerate(val_loader):
+                fluorescence, op, concentration_fluor, depth = fluorescence.to(DEVICE), op.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
                 pred_qf, pred_depth = model(op, fluorescence)
                 loss_qf = mse_loss(pred_qf, concentration_fluor)
                 loss_depth = mse_loss(pred_depth, depth)
@@ -161,7 +158,7 @@ def train(params):
         avg_val_loss = np.mean(val_loss)
         logger.info(f"Epoch {epoch + 1}/{params['epochs']}, Train Loss: {avg_train_loss:.4f}, qf_loss: {np.mean(qf_loss):.4f}, depth_loss: {np.mean(depth_loss):.4f}, val_loss: {avg_val_loss:.4f}, val_qf_loss: {np.mean(val_qf_loss):.4f}, val_depth_loss: {np.mean(val_depth_loss):.4f}")
 
-        #write to csv file
+        # write to csv file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = f'logs/loss_{timestamp}.csv'
         os.makedirs('logs', exist_ok=True)
