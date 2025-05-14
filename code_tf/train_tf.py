@@ -16,6 +16,7 @@ import numpy as np
 from model import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
+from datetime import datetime
 
 from utils.preprocess import load_data
 
@@ -112,7 +113,8 @@ def train(params):
         save_weights_only=False,
         verbose=1
     )
-    csv_logger = tf.keras.callbacks.CSVLogger('code_tf/logs/training.log', append=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_logger = tf.keras.callbacks.CSVLogger(f'code_tf/logs/loss_{timestamp}.log', append=True)
     callbacks = [lr_scheduler, early_stopping, batch_logger, checkpoint, csv_logger]
 
     # Train model

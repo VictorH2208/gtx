@@ -5,12 +5,17 @@ project_root = '/home/victorh/projects/gtx'
 os.chdir(project_root)
 sys.path.insert(0, project_root)
 
+import logging
+logging.basicConfig(level=logging.INFO) 
+logger = logging.getLogger(__name__)
+
 import argparse
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
+from datetime import datetime
 
 from model.unet import UnetModel
 from dataset import FluorescenceDataset
@@ -74,6 +79,7 @@ def train(params):
     optimizer = torch.optim.Adam(model.parameters(), lr=params['learningRate'])
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=params['decayRate'], patience=5)
     mse_loss = torch.nn.MSELoss()
+    mae_loss = torch.nn.L1Loss()
     
     # Init Dataset
     scale_params = {
@@ -105,18 +111,20 @@ def train(params):
         print(f"Epoch {epoch + 1}/{params['epochs']}")
         model.train()
         train_loss = []
+        qf_loss = []
+        depth_loss = []
         for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(train_loader):
 
-            fluorescence = fluorescence.to(DEVICE).to(memory_format=torch.channels_last).unsqueeze(1)
-            mu_a = mu_a.to(DEVICE)
-            mu_s = mu_s.to(DEVICE)
-            concentration_fluor = concentration_fluor.to(DEVICE).to(memory_format=torch.channels_last)
-            depth = depth.to(DEVICE).to(memory_format=torch.channels_last)
-
-            op = torch.cat([mu_a, mu_s], dim=1).to(memory_format=torch.channels_last)
+            fluorescence = fluorescence.to(DEVICE)
+            op = torch.cat([mu_a.unsqueeze(1), mu_s.unsqueeze(1)], dim=1)
+            op = op.permute(0, 2, 3, 1).to(DEVICE)
+            concentration_fluor = concentration_fluor.to(DEVICE)
+            depth = depth.to(DEVICE)
 
             if epoch == 0 and batch_idx == 0:
                 print(fluorescence.shape, op.shape, concentration_fluor.shape, depth.shape)
+
+            # return
 
             optimizer.zero_grad()
 
@@ -127,10 +135,14 @@ def train(params):
             loss.backward()
             optimizer.step()
             train_loss.append(loss.item())
+            qf_loss.append(loss_qf.item())
+            depth_loss.append(loss_depth.item())
 
         # Validation loop
         model.eval()
         val_loss = []
+        val_qf_loss = []
+        val_depth_loss = []
         with torch.no_grad():
             for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(val_loader):
                 fluorescence, mu_a, mu_s, concentration_fluor, depth = fluorescence.to(DEVICE), mu_a.to(DEVICE), mu_s.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
@@ -141,11 +153,24 @@ def train(params):
                 loss_depth = mse_loss(pred_depth, depth)
                 loss = loss_qf + loss_depth
                 val_loss.append(loss.item())
+                val_qf_loss.append(loss_qf.item())
+                val_depth_loss.append(loss_depth.item())
 
         # Print loss
         avg_train_loss = np.mean(train_loss)
         avg_val_loss = np.mean(val_loss)
-        print(f"Epoch {epoch + 1}/{params['epochs']}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+        logger.info(f"Epoch {epoch + 1}/{params['epochs']}, Train Loss: {avg_train_loss:.4f}, qf_loss: {np.mean(qf_loss):.4f}, depth_loss: {np.mean(depth_loss):.4f}, val_loss: {avg_val_loss:.4f}, val_qf_loss: {np.mean(val_qf_loss):.4f}, val_depth_loss: {np.mean(val_depth_loss):.4f}")
+
+        #write to csv file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = f'logs/loss_{timestamp}.csv'
+        os.makedirs('logs', exist_ok=True)
+        write_header = not os.path.exists(log_file) or os.path.getsize(log_file) == 0
+
+        with open(log_file, 'a') as f:
+            if write_header:
+                f.write("Epoch,Train_Loss,QF_Loss,Depth_Loss,Val_Loss,Val_QF_Loss,Val_Depth_Loss\n")
+            f.write(f"{epoch + 1},{avg_train_loss:.4f},{np.mean(qf_loss):.4f},{np.mean(depth_loss):.4f},{avg_val_loss:.4f},{np.mean(val_qf_loss):.4f},{np.mean(val_depth_loss):.4f}\n")
 
         # Update learning rate
         scheduler.step(avg_val_loss)
