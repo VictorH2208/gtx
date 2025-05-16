@@ -73,7 +73,7 @@ def train(params):
 
     # Initialize model
     model = UnetModel(params)
-    model.to(DEVICE)
+    model = torch.compile(model).to(DEVICE)
     
     # Initialize optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=params['learningRate'])
@@ -106,6 +106,10 @@ def train(params):
     best_val_loss = float('inf')
     patience_counter = 0
 
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = f'code_py/ckpt/{timestamp}/loss_{timestamp}.csv'
+    os.makedirs(f'code_py/ckpt/{timestamp}', exist_ok=True)
+
     # Training loop
     for epoch in range(params['epochs']):
         print(f"Epoch {epoch + 1}/{params['epochs']}")
@@ -113,23 +117,21 @@ def train(params):
         train_loss = []
         qf_loss = []
         depth_loss = []
-        for batch_idx, (fluorescence, op, concentration_fluor, depth) in enumerate(train_loader):
-
-            fluorescence = fluorescence.to(DEVICE)
-            op = op.to(DEVICE)
-            concentration_fluor = concentration_fluor.to(DEVICE)
-            depth = depth.to(DEVICE)
+        for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(train_loader):
+            print(f'Batch {batch_idx} of {len(train_loader)}') if batch_idx % 10 == 0 else None
+            fluorescence = fluorescence.permute(0,3,1,2).unsqueeze(1).to(DEVICE)
+            op = torch.cat([mu_a.unsqueeze(1), mu_s.unsqueeze(1)], dim=1).to(DEVICE)
+            concentration_fluor = concentration_fluor.unsqueeze(1).to(DEVICE)
+            depth = depth.unsqueeze(1).to(DEVICE)
 
             if epoch == 0 and batch_idx == 0:
                 print(fluorescence.shape, op.shape, concentration_fluor.shape, depth.shape)
 
-            return
-
             optimizer.zero_grad()
 
             pred_qf, pred_depth = model(op, fluorescence)
-            loss_qf = mse_loss(pred_qf, concentration_fluor)
-            loss_depth = mse_loss(pred_depth, depth)
+            loss_qf = mae_loss(pred_qf, concentration_fluor)
+            loss_depth = mae_loss(pred_depth, depth)
             loss = loss_qf + loss_depth
             loss.backward()
             optimizer.step()
@@ -143,11 +145,16 @@ def train(params):
         val_qf_loss = []
         val_depth_loss = []
         with torch.no_grad():
-            for batch_idx, (fluorescence, op, concentration_fluor, depth) in enumerate(val_loader):
-                fluorescence, op, concentration_fluor, depth = fluorescence.to(DEVICE), op.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
+            for batch_idx, (fluorescence, mu_a, mu_s, concentration_fluor, depth) in enumerate(val_loader):
+                fluorescence, mu_a, mu_s, concentration_fluor, depth = fluorescence.to(DEVICE), mu_a.to(DEVICE), mu_s.to(DEVICE), concentration_fluor.to(DEVICE), depth.to(DEVICE)
+                fluorescence = fluorescence.permute(0,3,1,2).unsqueeze(1).to(DEVICE)
+                op = torch.cat([mu_a.unsqueeze(1), mu_s.unsqueeze(1)], dim=1).to(DEVICE)
+                concentration_fluor = concentration_fluor.unsqueeze(1).to(DEVICE)
+                depth = depth.unsqueeze(1).to(DEVICE)
+
                 pred_qf, pred_depth = model(op, fluorescence)
-                loss_qf = mse_loss(pred_qf, concentration_fluor)
-                loss_depth = mse_loss(pred_depth, depth)
+                loss_qf = mae_loss(pred_qf, concentration_fluor)
+                loss_depth = mae_loss(pred_depth, depth)
                 loss = loss_qf + loss_depth
                 val_loss.append(loss.item())
                 val_qf_loss.append(loss_qf.item())
@@ -159,9 +166,6 @@ def train(params):
         logger.info(f"Epoch {epoch + 1}/{params['epochs']}, Train Loss: {avg_train_loss:.4f}, qf_loss: {np.mean(qf_loss):.4f}, depth_loss: {np.mean(depth_loss):.4f}, val_loss: {avg_val_loss:.4f}, val_qf_loss: {np.mean(val_qf_loss):.4f}, val_depth_loss: {np.mean(val_depth_loss):.4f}")
 
         # write to csv file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = f'logs/loss_{timestamp}.csv'
-        os.makedirs('logs', exist_ok=True)
         write_header = not os.path.exists(log_file) or os.path.getsize(log_file) == 0
 
         with open(log_file, 'a') as f:
@@ -175,7 +179,7 @@ def train(params):
         # Early stopping
         if avg_val_loss < best_val_loss - 1e-5:
             best_val_loss = avg_val_loss
-            torch.save(model.state_dict(), 'best_model.pth')
+            torch.save(model.state_dict(), f'code_py/ckpt/{timestamp}/best_model.pth')
             patience_counter = 0
         else:
             patience_counter += 1
