@@ -57,7 +57,7 @@ def get_arg_parser():
 
     # Data path
     parser.add_argument('--data_path', type=str, default='../data/20241118_test_data.mat')
-    parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+    parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
     return parser
 
 class BatchLogger(tf.keras.callbacks.Callback):
@@ -94,6 +94,7 @@ def train(params):
         data = load_data(params['data_path'], scale_params)
 
     fluorescence = data['fluorescence']
+    fluorescence = np.transpose(fluorescence, (0, 3, 1, 2))
     op = np.stack([data['mu_a'], data['mu_s']], axis=1)
     op = np.transpose(op, (0, 2, 3, 1))
     depth = data['depth']

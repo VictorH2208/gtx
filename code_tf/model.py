@@ -1,6 +1,6 @@
 
 from keras.models import Model
-from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation
+from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation, Permute
 from keras import metrics
 import keras
 
@@ -26,9 +26,7 @@ class ModelInit():
                 # Input Optical Properties
                 inOP_beg = Input(shape=(self.params['xX'],self.params['yY'],2))
                 ## Input Multi-Dimensional Fluorescence
-                inFL_beg = Input(shape=(self.params['xX'],self.params['yY'],self.params['nF'], 1))
-
-                ## NOTE: Batch normalization can cause instability in the validation loss
+                inFL_beg = Input(shape=(self.params['nF'], self.params['xX'], self.params['yY'], 1))
 
                 #3D CNN for all layers
 
@@ -59,6 +57,7 @@ class ModelInit():
                 inFL = Dropout(0.75)(inFL)
 
                 ## Concatenate Branch ##
+                inFL = Permute((2, 3, 1, 4))(inFL)
                 inFL = Reshape((inFL.shape[1], inFL.shape[2], inFL.shape[3] * inFL.shape[4]))(inFL)
                 concat = concatenate([inOP,inFL],axis=-1)
 
