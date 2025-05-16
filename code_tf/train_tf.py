@@ -56,8 +56,8 @@ def get_arg_parser():
     parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
 
     # Data path
-    parser.add_argument('--data_path', type=str, default='data/')
-    parser.add_argument('--model_dir', type=str, default='code_tf/ckpt/')
+    parser.add_argument('--data_path', type=str, default='../data/20241118_test_data.mat')
+    parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}')
     return parser
 
 class BatchLogger(tf.keras.callbacks.Callback):
