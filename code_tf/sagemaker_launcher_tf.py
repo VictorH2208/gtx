@@ -20,7 +20,7 @@ estimator = TensorFlow(
         "epochs": 2,
         "nF": 6,
         "learningRate": 5e-4,
-        "batch": 32,
+        "batch": 1,
         "xX": 101,
         "yY": 101,
         "decayRate": 0.4,
