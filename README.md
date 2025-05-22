@@ -17,3 +17,7 @@ bash train_tf.sh
 cd code_py
 bash train_py.sh
 ```
+
+## Sagemaker
+
+`cd code_{tf/py}` and run the `sagemaker_launcher_{tf/py}.py` file.
