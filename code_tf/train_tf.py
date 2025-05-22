@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from model import ModelInit
+from code_tf.model.model import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime
@@ -126,6 +126,7 @@ def train(params):
     op = np.transpose(op, (0, 2, 3, 1))
     depth = data['depth']
     concentration_fluor = data['concentration_fluor']
+    reflectance = data['reflectance']
 
     print(op.shape)
     print(fluorescence.shape)
@@ -156,8 +157,18 @@ def train(params):
     callbacks = [lr_scheduler, early_stopping, batch_logger, checkpoint, csv_logger]
 
     # Train model
-    model.model.fit([op, fluorescence], {'outQF': concentration_fluor, 'outDF': depth}, validation_split=0.2, batch_size=params['batch'], epochs=params['epochs'], verbose=0, shuffle=True, callbacks=callbacks)
-        
+    # model.model.fit([op, fluorescence], {'outQF': concentration_fluor, 'outDF': depth}, validation_split=0.2, batch_size=params['batch'], epochs=params['epochs'], verbose=0, shuffle=True, callbacks=callbacks)
+    
+    model.model.fit(
+        [op, fluorescence],
+        {'outQF': concentration_fluor, 'outDF': depth, 'outReflect': reflectance},
+        validation_split=0.2,
+        batch_size=params['batch'],
+        epochs=params['epochs'],
+        verbose=0,
+        shuffle=True,
+        callbacks=callbacks
+    )
         
 if __name__ == "__main__":
     parser = get_arg_parser()
