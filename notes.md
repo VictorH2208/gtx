@@ -27,6 +27,8 @@ Learning Synthesis Lectures on Artificial Intelligence and
 Machine Learning. Morgan & Claypool Publishers. 2009.
 3:pp 1–130.
 
+Noise2Void （not that useful）
+
 DL architecture
 
 - GAN?

@@ -20,6 +20,15 @@ from datetime import datetime
 
 from utils.preprocess import load_data
 
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        print(gpus)
+        tf.config.set_visible_devices(gpus[0], 'GPU')
+        tf.config.experimental.set_memory_growth(gpus[0], True)
+    except RuntimeError as e:
+        print(e)
+
 def get_arg_parser():
     parser = argparse.ArgumentParser(description="Hyperparameter configuration for fluorescence imaging model.")
 
@@ -61,20 +70,38 @@ def get_arg_parser():
     return parser
 
 class BatchLogger(tf.keras.callbacks.Callback):
-    def __init__(self, log_interval=50):
+    def __init__(self, log_interval=50, num_samples=None, batch_size=None):
         super().__init__()
         self.log_interval = log_interval
+        self.total_batches = num_samples // batch_size
 
     def on_train_batch_end(self, batch, logs=None):
         if batch % self.log_interval == 0:
             loss = logs.get('loss')
-            logging.info(f"[Batch {batch}] Loss: {loss:.4f}")
+            logging.info(f"[Batch {batch}/{self.total_batches}] Loss: {loss:.4f}")
 
     def on_epoch_end(self, epoch, logs=None):
         logging.info(
             f"Epoch {epoch}: "
             + ", ".join([f"{k} = {v:.4f}" for k, v in logs.items() if isinstance(v, float)])
         )
+
+class CustomModelCheckpoint(tf.keras.callbacks.Callback):
+    def __init__(self, filepath, monitor='val_loss', verbose=1):
+        super().__init__()
+        self.filepath = filepath
+        self.monitor = monitor
+        self.best = float('inf')
+        self.verbose = verbose
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        current = logs.get(self.monitor)
+        if current is not None and current < self.best:
+            if self.verbose:
+                print(f"Epoch {epoch}: {self.monitor} improved from {self.best:.5f} to {current:.5f}, saving model to {self.filepath}")
+            self.best = current
+            self.model.save(self.filepath)
 
 def train(params):
 
@@ -88,7 +115,7 @@ def train(params):
         'reflectance': params['scaleRE']
     }
     if params['sagemaker']:
-        filepath = os.path.join('/opt/ml/input/data/training', 'nImages1000_new.mat')
+        filepath = os.path.join('/opt/ml/input/data/training', 'nImages10000_new.mat')
         data = load_data(filepath, scale_params)
     else:
         data = load_data(params['data_path'], scale_params)
@@ -112,7 +139,7 @@ def train(params):
     # Initialize optimizer
     lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=params['decayRate'], patience=5, verbose=1, min_lr=5e-5)
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=params['patience'], verbose=1, mode='auto')
-    batch_logger = BatchLogger(log_interval=20)
+    batch_logger = BatchLogger(log_interval=20, num_samples= int(fluorescence.shape[0] * 0.8), batch_size=params['batch'])
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if params['sagemaker']:
@@ -120,11 +147,9 @@ def train(params):
     else:
         model_dir = params['model_dir']
 
-    checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(model_dir, f'model_ckpt_{timestamp}.h5'), 
+    checkpoint = CustomModelCheckpoint(
+        filepath=os.path.join(model_dir, f'model_ckpt_{timestamp}.keras'),
         monitor='val_loss',
-        save_best_only=True,
-        save_weights_only=False,
         verbose=1
     )
     csv_logger = tf.keras.callbacks.CSVLogger(os.path.join(model_dir, f'loss_{timestamp}.log'), append=True)
