@@ -3,6 +3,6 @@ data/
 .DS_Store
 __pycache__/
 code_tf/ckpt/
-code_tf/logs/
+code_tf/sagemaker_ckpts/
 code_py/ckpt/
-code_py/logs/
+code_py/sagemaker_ckpts/
