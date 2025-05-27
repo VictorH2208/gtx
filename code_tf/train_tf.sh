@@ -30,7 +30,7 @@ FILTERS_2D=128
 KERNEL_2D="3 3"
 STRIDE_2D="1 1"
 
-DATA_PATH="../data/20241118_test_data.mat"
+DATA_PATH="../data/20241118_data_splited.mat"
 # === Run training ===
 echo "Launching training with the following parameters:"
 

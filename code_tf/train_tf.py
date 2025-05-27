@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from code_tf.model.model import ModelInit
+from model.model import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime
 
-from utils.preprocess import load_data
+from preprocess import load_data
 
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
@@ -65,7 +65,7 @@ def get_arg_parser():
     parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
 
     # Data path
-    parser.add_argument('--data_path', type=str, default='../data/20241118_test_data.mat')
+    parser.add_argument('--data_path', type=str, default='../data/20241118_data_splited.mat')
     parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
     return parser
 
@@ -114,24 +114,39 @@ def train(params):
         'concentration_fluor': params['scaleQF'],
         'reflectance': params['scaleRE']
     }
+
     if params['sagemaker']:
-        filepath = os.path.join('/opt/ml/input/data/training', 'nImages10000_new.mat')
+        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_splited.mat')
         data = load_data(filepath, scale_params)
     else:
         data = load_data(params['data_path'], scale_params)
 
-    fluorescence = data['fluorescence']
-    fluorescence = np.transpose(fluorescence, (0, 3, 1, 2))
-    op = np.stack([data['mu_a'], data['mu_s']], axis=1)
-    op = np.transpose(op, (0, 2, 3, 1))
-    depth = data['depth']
-    concentration_fluor = data['concentration_fluor']
-    reflectance = data['reflectance']
+    train_data = data['train']
+    train_fluorescence = train_data['fluorescence']
+    train_fluorescence = np.transpose(train_fluorescence, (0, 3, 1, 2))
+    train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1)
+    train_op = np.transpose(train_op, (0, 2, 3, 1))
+    train_depth = train_data['depth']
+    train_concentration_fluor = train_data['concentration_fluor']
+    train_reflectance = train_data['reflectance']
 
-    print(op.shape)
-    print(fluorescence.shape)
-    print(depth.shape)
-    print(concentration_fluor.shape)
+    val_data = data['val']
+    val_fluorescence = val_data['fluorescence']
+    val_fluorescence = np.transpose(val_fluorescence, (0, 3, 1, 2))
+    val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1)
+    val_op = np.transpose(val_op, (0, 2, 3, 1))
+    val_depth = val_data['depth']
+    val_concentration_fluor = val_data['concentration_fluor']
+    val_reflectance = val_data['reflectance']
+
+    test_data = data['test']
+    test_fluorescence = test_data['fluorescence']
+    test_fluorescence = np.transpose(test_fluorescence, (0, 3, 1, 2))
+    test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1)
+    test_op = np.transpose(test_op, (0, 2, 3, 1))
+    test_depth = test_data['depth']
+    test_concentration_fluor = test_data['concentration_fluor']
+    test_reflectance = test_data['reflectance']
 
     # Initialize model
     model = ModelInit(params)
@@ -140,13 +155,14 @@ def train(params):
     # Initialize optimizer
     lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=params['decayRate'], patience=5, verbose=1, min_lr=5e-5)
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=params['patience'], verbose=1, mode='auto')
-    batch_logger = BatchLogger(log_interval=20, num_samples= int(fluorescence.shape[0] * 0.8), batch_size=params['batch'])
+    batch_logger = BatchLogger(log_interval=20, num_samples= int(train_fluorescence.shape[0]), batch_size=params['batch'])
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if params['sagemaker']:
         model_dir = '/opt/ml/model'
     else:
         model_dir = params['model_dir']
+        os.makedirs(model_dir, exist_ok=True)
 
     checkpoint = CustomModelCheckpoint(
         filepath=os.path.join(model_dir, f'model_ckpt_{timestamp}.keras'),
@@ -157,18 +173,27 @@ def train(params):
     callbacks = [lr_scheduler, early_stopping, batch_logger, checkpoint, csv_logger]
 
     # Train model
-    # model.model.fit([op, fluorescence], {'outQF': concentration_fluor, 'outDF': depth}, validation_split=0.2, batch_size=params['batch'], epochs=params['epochs'], verbose=0, shuffle=True, callbacks=callbacks)
-    
     model.model.fit(
-        [op, fluorescence],
-        {'outQF': concentration_fluor, 'outDF': depth, 'outReflect': reflectance},
-        validation_split=0.2,
+        [train_op, train_fluorescence],
+        {'outQF': train_concentration_fluor, 'outDF': train_depth},
+        validation_data=([val_op, val_fluorescence], {'outQF': val_concentration_fluor, 'outDF': val_depth}),
         batch_size=params['batch'],
         epochs=params['epochs'],
         verbose=0,
         shuffle=True,
         callbacks=callbacks
     )
+    
+    # model.model.fit(
+    #     [train_op, train_fluorescence],
+    #     {'outQF': train_concentration_fluor, 'outDF': train_depth, 'outReflect': train_reflectance},
+    #     validation_data=([val_op, val_fluorescence], {'outQF': val_concentration_fluor, 'outDF': val_depth, 'outReflect': val_reflectance}),
+    #     batch_size=params['batch'],
+    #     epochs=params['epochs'],
+    #     verbose=0,
+    #     shuffle=True,
+    #     callbacks=callbacks
+    # )
         
 if __name__ == "__main__":
     parser = get_arg_parser()
