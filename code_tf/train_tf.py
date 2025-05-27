@@ -20,6 +20,9 @@ from datetime import datetime
 
 from preprocess import load_data
 
+np.random.seed(1024)
+tf.random.set_seed(1024)
+
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     try:
@@ -130,6 +133,12 @@ def train(params):
     train_concentration_fluor = train_data['concentration_fluor']
     train_reflectance = train_data['reflectance']
 
+    train_dataset = tf.data.Dataset.from_tensor_slices((
+        (train_op, train_fluorescence),  # tuple of inputs
+        {'outQF': train_concentration_fluor, 'outDF': train_depth}  # dict of outputs
+    ))
+    train_dataset = train_dataset.shuffle(buffer_size=1000, seed=1024, reshuffle_each_iteration=False).batch(params['batch'])
+
     val_data = data['val']
     val_fluorescence = val_data['fluorescence']
     val_fluorescence = np.transpose(val_fluorescence, (0, 3, 1, 2))
@@ -139,6 +148,12 @@ def train(params):
     val_concentration_fluor = val_data['concentration_fluor']
     val_reflectance = val_data['reflectance']
 
+    val_dataset = tf.data.Dataset.from_tensor_slices((
+        (val_op, val_fluorescence),  # tuple of inputs
+        {'outQF': val_concentration_fluor, 'outDF': val_depth}  # dict of outputs
+    ))
+    val_dataset = val_dataset.batch(params['batch'])
+
     test_data = data['test']
     test_fluorescence = test_data['fluorescence']
     test_fluorescence = np.transpose(test_fluorescence, (0, 3, 1, 2))
@@ -147,6 +162,12 @@ def train(params):
     test_depth = test_data['depth']
     test_concentration_fluor = test_data['concentration_fluor']
     test_reflectance = test_data['reflectance']
+
+    test_dataset = tf.data.Dataset.from_tensor_slices((
+        (test_op, test_fluorescence),  # tuple of inputs
+        {'outQF': test_concentration_fluor, 'outDF': test_depth}  # dict of outputs
+    ))
+    test_dataset = test_dataset.batch(params['batch'])
 
     # Initialize model
     model = ModelInit(params)
@@ -171,16 +192,14 @@ def train(params):
     )
     csv_logger = tf.keras.callbacks.CSVLogger(os.path.join(model_dir, f'loss_{timestamp}.log'), append=True)
     callbacks = [lr_scheduler, early_stopping, batch_logger, checkpoint, csv_logger]
+    
 
     # Train model
     model.model.fit(
-        [train_op, train_fluorescence],
-        {'outQF': train_concentration_fluor, 'outDF': train_depth},
-        validation_data=([val_op, val_fluorescence], {'outQF': val_concentration_fluor, 'outDF': val_depth}),
-        batch_size=params['batch'],
+        train_dataset,
+        validation_data=val_dataset,
         epochs=params['epochs'],
-        verbose=0,
-        shuffle=True,
+        verbose=0,  
         callbacks=callbacks
     )
     
@@ -194,6 +213,13 @@ def train(params):
     #     shuffle=True,
     #     callbacks=callbacks
     # )
+
+    model.load_model(os.path.join(model_dir, f'model_ckpt_{timestamp}.keras'))
+    model.model.evaluate(
+        test_dataset,
+        verbose=1
+    )
+
         
 if __name__ == "__main__":
     parser = get_arg_parser()

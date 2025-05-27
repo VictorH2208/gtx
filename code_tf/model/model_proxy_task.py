@@ -208,3 +208,7 @@ class ModelInit():
                 self.model.summary()
 
                 return None
+        
+        def load_model(self, model_path):
+            self.model = keras.models.load_model(model_path)
+            return None
