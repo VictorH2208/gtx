@@ -195,14 +195,14 @@ class ModelInit():
                 self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outQF, outDF, outReflect])
 
                 self.model.compile(
-                    loss={'outQF': 'mae', 'outDF': 'mae', 'outReflect': 'mse'},
+                    loss={'outQF': 'mse', 'outDF': 'mse', 'outReflect': 'mse'},
                     optimizer=getattr(keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
                     metrics={
-                        'outQF': metrics.MeanAbsoluteError(name='mae_qf'),
-                        'outDF': metrics.MeanAbsoluteError(name='mae_df'),
+                        'outQF': metrics.MeanSquaredError(name='mse_qf'),
+                        'outDF': metrics.MeanSquaredError(name='mse_df'),
                         'outReflect': metrics.MeanSquaredError(name='mse_reflect')
                     },
-                    loss_weights={'outQF': 1.0, 'outDF': 1.0, 'outReflect': 0.3}
+                    loss_weights={'outQF': 1.0, 'outDF': 1.0, 'outReflect': 1.0}
                 )
                 
                 self.model.summary()

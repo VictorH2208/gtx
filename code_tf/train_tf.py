@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from model.model import ModelInit
+from model.model_proxy_task import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime
@@ -133,9 +133,13 @@ def train(params):
     train_concentration_fluor = train_data['concentration_fluor']
     train_reflectance = train_data['reflectance']
 
+    # train_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (train_op, train_fluorescence),  # tuple of inputs
+    #     {'outQF': train_concentration_fluor, 'outDF': train_depth}  # dict of outputs
+    # ))
     train_dataset = tf.data.Dataset.from_tensor_slices((
         (train_op, train_fluorescence),  # tuple of inputs
-        {'outQF': train_concentration_fluor, 'outDF': train_depth}  # dict of outputs
+        {'outQF': train_concentration_fluor, 'outDF': train_depth, 'outReflect': train_reflectance}  # dict of outputs
     ))
     train_dataset = train_dataset.shuffle(buffer_size=1000, seed=1024, reshuffle_each_iteration=False).batch(params['batch'])
 
@@ -148,9 +152,13 @@ def train(params):
     val_concentration_fluor = val_data['concentration_fluor']
     val_reflectance = val_data['reflectance']
 
+    # val_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (val_op, val_fluorescence),  # tuple of inputs
+    #     {'outQF': val_concentration_fluor, 'outDF': val_depth}  # dict of outputs
+    # ))
     val_dataset = tf.data.Dataset.from_tensor_slices((
         (val_op, val_fluorescence),  # tuple of inputs
-        {'outQF': val_concentration_fluor, 'outDF': val_depth}  # dict of outputs
+        {'outQF': val_concentration_fluor, 'outDF': val_depth, 'outReflect': val_reflectance}  # dict of outputs
     ))
     val_dataset = val_dataset.batch(params['batch'])
 
@@ -163,9 +171,13 @@ def train(params):
     test_concentration_fluor = test_data['concentration_fluor']
     test_reflectance = test_data['reflectance']
 
+    # test_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (test_op, test_fluorescence),  # tuple of inputs
+    #     {'outQF': test_concentration_fluor, 'outDF': test_depth}  # dict of outputs
+    # ))
     test_dataset = tf.data.Dataset.from_tensor_slices((
         (test_op, test_fluorescence),  # tuple of inputs
-        {'outQF': test_concentration_fluor, 'outDF': test_depth}  # dict of outputs
+        {'outQF': test_concentration_fluor, 'outDF': test_depth, 'outReflect': test_reflectance}  # dict of outputs
     ))
     test_dataset = test_dataset.batch(params['batch'])
 
@@ -203,16 +215,6 @@ def train(params):
         callbacks=callbacks
     )
     
-    # model.model.fit(
-    #     [train_op, train_fluorescence],
-    #     {'outQF': train_concentration_fluor, 'outDF': train_depth, 'outReflect': train_reflectance},
-    #     validation_data=([val_op, val_fluorescence], {'outQF': val_concentration_fluor, 'outDF': val_depth, 'outReflect': val_reflectance}),
-    #     batch_size=params['batch'],
-    #     epochs=params['epochs'],
-    #     verbose=0,
-    #     shuffle=True,
-    #     callbacks=callbacks
-    # )
 
     model.load_model(os.path.join(model_dir, f'model_ckpt_{timestamp}.keras'))
     model.model.evaluate(
