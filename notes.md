@@ -50,9 +50,11 @@ Monte Carlo‐based photon “replay. Biomed Opt Express
 2018;9:4588.
 
 
-Questions?
+1. Matlab inverse code
+2. Physics nn literature review
+3. stl file gen for monte carlo
+4. Pipeline eval code for monte carlo and phantom
 
-- Why not use raw data for input to the model?
 
 
 
