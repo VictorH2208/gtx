@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from model.model_proxy_task import ModelInit
+from model.model import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime
@@ -128,10 +128,9 @@ def train(params):
     train_fluorescence = train_data['fluorescence']
     train_fluorescence = np.transpose(train_fluorescence, (0, 3, 1, 2))
     train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1)
-    train_op = np.transpose(train_op, (0, 2, 3, 1))
     train_depth = train_data['depth']
     train_concentration_fluor = train_data['concentration_fluor']
-    train_reflectance = train_data['reflectance']
+    train_reflectance = np.transpose(train_data['reflectance'], (0, 3, 1, 2))
 
     # train_dataset = tf.data.Dataset.from_tensor_slices((
     #     (train_op, train_fluorescence),  # tuple of inputs
@@ -147,10 +146,9 @@ def train(params):
     val_fluorescence = val_data['fluorescence']
     val_fluorescence = np.transpose(val_fluorescence, (0, 3, 1, 2))
     val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1)
-    val_op = np.transpose(val_op, (0, 2, 3, 1))
     val_depth = val_data['depth']
     val_concentration_fluor = val_data['concentration_fluor']
-    val_reflectance = val_data['reflectance']
+    val_reflectance = np.transpose(val_data['reflectance'], (0, 3, 1, 2))
 
     # val_dataset = tf.data.Dataset.from_tensor_slices((
     #     (val_op, val_fluorescence),  # tuple of inputs
@@ -166,10 +164,9 @@ def train(params):
     test_fluorescence = test_data['fluorescence']
     test_fluorescence = np.transpose(test_fluorescence, (0, 3, 1, 2))
     test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1)
-    test_op = np.transpose(test_op, (0, 2, 3, 1))
     test_depth = test_data['depth']
     test_concentration_fluor = test_data['concentration_fluor']
-    test_reflectance = test_data['reflectance']
+    test_reflectance = np.transpose(test_data['reflectance'], (0, 3, 1, 2))
 
     # test_dataset = tf.data.Dataset.from_tensor_slices((
     #     (test_op, test_fluorescence),  # tuple of inputs

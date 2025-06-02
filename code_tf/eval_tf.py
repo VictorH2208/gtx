@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from code_tf.model.model import ModelInit
-from utils.preprocess import load_data
+from utils.preprocess.dt_data_preprocess import load_data
 
 def get_arg_parser():
     parser = argparse.ArgumentParser(description="Eval script for fluorescence imaging model.")
@@ -22,6 +22,7 @@ def get_arg_parser():
     return parser
 
 def eval(params):
+    # This is to evaluate the phantom and monte carlo simulated data
     scale_params = {
         'fluorescence': params['scaleFL'],
         'mu_a': params['scaleOP0'],
@@ -30,7 +31,9 @@ def eval(params):
         'concentration_fluor': params['scaleQF'],
         'reflectance': params['scaleRE']
     }
-    data = load_data(params['data_path'], scale_params)
+
+    # Load the data. TODO： adapt to the monte carlo and phantom data
+    data = load_data(params['data_path'], scale_params) 
 
     fluorescence = data['fluorescence']
     fluorescence = np.transpose(fluorescence, (0, 3, 1, 2))
@@ -50,11 +53,16 @@ def eval(params):
         {'outQF': concentration_fluor, 'outDF': depth, 'outReflect': reflectance},
         batch_size=params['batch'],
         verbose=1
-    )
+    ) # Three outputs: loss, outQF, outDF, outReflect
 
     print("\nEvaluation results:")
-    for name, value in zip(model.metrics_names, results):
-        print(f"{name}: {value:.4f}")
+    results_dict = {
+        'val_loss': results[0],
+        'val_outQF': results[1],
+        'val_outDF': results[2],
+        'val_outReflect': results[3]
+    }
+    print(results_dict)
 
     # Optionally: save predictions for later analysis
     # predictions = model.predict([op, fluorescence], batch_size=params['batch'])
