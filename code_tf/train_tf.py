@@ -127,55 +127,64 @@ def train(params):
     train_data = data['train']
     train_fluorescence = train_data['fluorescence']
     train_fluorescence = np.transpose(train_fluorescence, (0, 3, 1, 2))
-    train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1)
+    train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)
+    train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     train_depth = train_data['depth']
     train_concentration_fluor = train_data['concentration_fluor']
-    train_reflectance = np.transpose(train_data['reflectance'], (0, 3, 1, 2))
+    train_reflectance = train_data['reflectance']
 
-    # train_dataset = tf.data.Dataset.from_tensor_slices((
-    #     (train_op, train_fluorescence),  # tuple of inputs
-    #     {'outQF': train_concentration_fluor, 'outDF': train_depth}  # dict of outputs
-    # ))
+    print(train_fluorescence.shape)
+    print(train_op.shape)
+    print(train_depth.shape)
+    print(train_concentration_fluor.shape)
+    print(train_reflectance.shape)
+
     train_dataset = tf.data.Dataset.from_tensor_slices((
         (train_op, train_fluorescence),  # tuple of inputs
-        {'outQF': train_concentration_fluor, 'outDF': train_depth, 'outReflect': train_reflectance}  # dict of outputs
+        {'outQF': train_concentration_fluor, 'outDF': train_depth}  # dict of outputs
     ))
+    # train_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (train_op, train_fluorescence),  # tuple of inputs
+    #     {'outQF': train_concentration_fluor, 'outDF': train_depth, 'outReflect': train_reflectance}  # dict of outputs
+    # ))
     train_dataset = train_dataset.shuffle(buffer_size=1000, seed=1024, reshuffle_each_iteration=False).batch(params['batch'])
 
     val_data = data['val']
     val_fluorescence = val_data['fluorescence']
     val_fluorescence = np.transpose(val_fluorescence, (0, 3, 1, 2))
-    val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1)
+    val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)
+    val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     val_depth = val_data['depth']
     val_concentration_fluor = val_data['concentration_fluor']
-    val_reflectance = np.transpose(val_data['reflectance'], (0, 3, 1, 2))
+    val_reflectance = val_data['reflectance']
 
-    # val_dataset = tf.data.Dataset.from_tensor_slices((
-    #     (val_op, val_fluorescence),  # tuple of inputs
-    #     {'outQF': val_concentration_fluor, 'outDF': val_depth}  # dict of outputs
-    # ))
     val_dataset = tf.data.Dataset.from_tensor_slices((
         (val_op, val_fluorescence),  # tuple of inputs
-        {'outQF': val_concentration_fluor, 'outDF': val_depth, 'outReflect': val_reflectance}  # dict of outputs
+        {'outQF': val_concentration_fluor, 'outDF': val_depth}  # dict of outputs
     ))
+    # val_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (val_op, val_fluorescence),  # tuple of inputs
+    #     {'outQF': val_concentration_fluor, 'outDF': val_depth, 'outReflect': val_reflectance}  # dict of outputs
+    # ))
     val_dataset = val_dataset.batch(params['batch'])
 
     test_data = data['test']
     test_fluorescence = test_data['fluorescence']
     test_fluorescence = np.transpose(test_fluorescence, (0, 3, 1, 2))
-    test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1)
+    test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)
+    test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     test_depth = test_data['depth']
     test_concentration_fluor = test_data['concentration_fluor']
-    test_reflectance = np.transpose(test_data['reflectance'], (0, 3, 1, 2))
+    test_reflectance = test_data['reflectance']
 
-    # test_dataset = tf.data.Dataset.from_tensor_slices((
-    #     (test_op, test_fluorescence),  # tuple of inputs
-    #     {'outQF': test_concentration_fluor, 'outDF': test_depth}  # dict of outputs
-    # ))
     test_dataset = tf.data.Dataset.from_tensor_slices((
         (test_op, test_fluorescence),  # tuple of inputs
-        {'outQF': test_concentration_fluor, 'outDF': test_depth, 'outReflect': test_reflectance}  # dict of outputs
+        {'outQF': test_concentration_fluor, 'outDF': test_depth}  # dict of outputs
     ))
+    # test_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (test_op, test_fluorescence),  # tuple of inputs
+    #     {'outQF': test_concentration_fluor, 'outDF': test_depth, 'outReflect': test_reflectance}  # dict of outputs
+    # ))
     test_dataset = test_dataset.batch(params['batch'])
 
     # Initialize model
