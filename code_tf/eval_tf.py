@@ -43,15 +43,19 @@ def eval(params):
     concentration_fluor = data['concentration_fluor']
     reflectance = data['reflectance']
 
+    phantom_dataset = tf.data.Dataset.from_tensor_slices(
+        (op, fluorescence),
+        {'outQF': concentration_fluor, 'outDF': depth, 'outReflect': reflectance}
+    )
+    phantom_dataset = phantom_dataset.batch(params['batch'])
+
     # Load the model
     print(f"Loading model from {params['model_path']}")
     model = tf.keras.models.load_model(params['model_path'])
 
     # Evaluate
     results = model.evaluate(
-        [op, fluorescence],
-        {'outQF': concentration_fluor, 'outDF': depth, 'outReflect': reflectance},
-        batch_size=params['batch'],
+        phantom_dataset,
         verbose=1
     ) # Three outputs: loss, outQF, outDF, outReflect
 
