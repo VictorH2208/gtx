@@ -165,11 +165,11 @@ class ModelInit():
                 self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outQF, outDF])
 
                 self.model.compile(
-                    loss={'outQF': 'mae', 'outDF': 'mae'},
+                    loss={'outQF': 'mse', 'outDF': 'mse'},
                     optimizer=getattr(keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
                     metrics={
-                        'outQF': metrics.MeanAbsoluteError(name='mae_qf'),
-                        'outDF': metrics.MeanAbsoluteError(name='mae_df')
+                        'outQF': metrics.MeanSquaredError(name='mse_qf'),
+                        'outDF': metrics.MeanSquaredError(name='mse_df')
                     }
                 )
                 
