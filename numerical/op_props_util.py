@@ -1,5 +1,6 @@
 import os
-os.chdir('/home/victorhuang/projects/gtx')
+# os.chdir('/home/victorhuang/projects/gtx')
+os.chdir('/home/victorh/projects/gtx')
 
 import numpy as np
 import mat73
@@ -80,6 +81,7 @@ def opt_prop_hb(lambda_vals, fHb, StO2):
             Hb = json.load(f)         
         
         HbO2 = np.array(HbO2)
+        Hb = np.array(Hb)
 
         # Convert to mm^-1/(g/L)
         HbO2 = HbO2 / 10.0
