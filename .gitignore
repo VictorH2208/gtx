@@ -2,7 +2,12 @@
 data/
 .DS_Store
 __pycache__/
+
 code_tf/ckpt/
 code_tf/sagemaker_ckpts/
+
 code_py/ckpt/
 code_py/sagemaker_ckpts/
+
+code_kan/model/
+code_kan/figures/
