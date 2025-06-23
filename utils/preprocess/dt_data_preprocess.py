@@ -38,7 +38,7 @@ def load_split_data(file_path):
 
     return data_by_split
 
-def load_data(file_path, scale_params):
+def load_data(file_path, scale_params=None):
     data_by_split = load_split_data(file_path)
 
     result = {}
