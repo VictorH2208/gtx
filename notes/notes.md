@@ -56,5 +56,8 @@ Monte Carlo‐based photon “replay. Biomed Opt Express
 4. Pipeline eval code for monte carlo and phantom
 
 
-
+Tumor Shape
+* small shallow (0.1 mm - 3 mm deep, 5 mm - 10 mm diam, 5 mm - 10 mm in height)
+* medium shallow (0.1 mm - 3 mm deep, 10 mm - 15 mm diam, 5 mm - 10 mm in height)
+* large shallow (0.1 mm - 3 mm deep, 15 mm - 20 mm diam, 5 mm - 10 mm in height)
 
