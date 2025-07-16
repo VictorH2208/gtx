@@ -61,3 +61,11 @@ Tumor Shape
 * medium shallow (0.1 mm - 3 mm deep, 10 mm - 15 mm diam, 5 mm - 10 mm in height)
 * large shallow (0.1 mm - 3 mm deep, 15 mm - 20 mm diam, 5 mm - 10 mm in height)
 
+* small sheep (3 mm - 6 mm deep, 5 mm - 10 mm diam, 5 mm - 10 mm in height)
+* medium sheep (3 mm - 6 mm deep, 10 mm - 15 mm diam, 5 mm - 10 mm in height)
+* large sheep (3 mm - 6 mm deep, 15 mm - 20 mm diam, 5 mm - 10 mm in height)
+
+* small deep (6 mm - 9 mm deep, 5 mm - 10 mm diam, 5 mm - 10 mm in height)
+* medium deep (6 mm - 9 mm deep, 10 mm - 15 mm diam, 5 mm - 10 mm in height)
+* large deep (6 mm - 9 mm deep, 15 mm - 20 mm diam, 5 mm - 10 mm in height)
+
