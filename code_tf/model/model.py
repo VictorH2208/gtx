@@ -3,6 +3,40 @@ from keras.models import Model
 from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation, Permute
 from keras import metrics
 import keras
+import tensorflow as tf
+
+def non_zero_mae(y_true, y_pred):
+    mask = tf.not_equal(y_true, 0.0)
+    err  = tf.abs(y_true - y_pred)
+    masked_err = tf.boolean_mask(err, mask)
+    return tf.cond(
+        tf.size(masked_err) > 0,
+        lambda: tf.reduce_mean(masked_err),
+        lambda: tf.constant(0.0)
+    )
+
+
+class GlobalNonZeroMAE(tf.keras.metrics.Metric):
+    def __init__(self, name="global_nonzero_mae", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.total_error = self.add_weight(name="total_error", initializer="zeros")
+        self.total_count = self.add_weight(name="total_count", initializer="zeros")
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        # compute per-batch mask & errors
+        mask = tf.not_equal(y_true, 0.0)
+        err  = tf.abs(y_true - y_pred)
+        err_nonzero = tf.boolean_mask(err, mask)
+        # accumulate
+        self.total_error.assign_add(tf.reduce_sum(err_nonzero))
+        self.total_count.assign_add(tf.cast(tf.size(err_nonzero), tf.float32))
+
+    def result(self):
+        return tf.math.divide_no_nan(self.total_error, self.total_count)
+
+    def reset_states(self):
+        self.total_error.assign(0.0)
+        self.total_count.assign(0.0)
 
 class ModelInit():  
 
@@ -169,7 +203,7 @@ class ModelInit():
                     optimizer=getattr(keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
                     metrics={
                         'outQF': metrics.MeanSquaredError(name='mse_qf'),
-                        'outDF': metrics.MeanSquaredError(name='mse_df')
+                        'outDF': [metrics.MeanSquaredError(name='mse_df'), non_zero_mae]
                     }
                 )
                 
