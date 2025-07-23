@@ -50,23 +50,23 @@ def load_data(file_path, scale_params):
         concentration_fluor = data_by_split[type]['concentration_fluor']
         reflectance = data_by_split[type]['reflectance']
 
-        f, mu_a_norm, mu_s_norm = normalization(fluorescence, optical_props)
-        data_dict = {
-            'fluorescence': f,
-            'reflectance': reflectance,
-            'depth': depth, 
-            'mu_a': mu_a_norm,
-            'mu_s': mu_s_norm,
-            'concentration_fluor': concentration_fluor}
-        # scaled_data_dict = scale_data({
+        # f, mu_a_norm, mu_s_norm = normalization(fluorescence, optical_props)
+        # data_dict = {
         #     'fluorescence': f,
         #     'reflectance': reflectance,
         #     'depth': depth, 
         #     'mu_a': mu_a_norm,
         #     'mu_s': mu_s_norm,
-        #     'concentration_fluor': concentration_fluor
-        #     }, scale_params)
+        #     'concentration_fluor': concentration_fluor}
+        scaled_data_dict = scale_data({
+            'fluorescence': fluorescence,
+            'reflectance': reflectance,
+            'depth': depth, 
+            'mu_a': optical_props[..., 0],
+            'mu_s': optical_props[..., 1],
+            'concentration_fluor': concentration_fluor
+            }, scale_params)
         
-        result[type] = data_dict
+        result[type] = scaled_data_dict
 
     return result

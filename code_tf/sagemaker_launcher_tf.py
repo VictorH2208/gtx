@@ -24,7 +24,7 @@ estimator = TensorFlow(
         "xX": 101,
         "yY": 101,
         "decayRate": 0.4,
-        "scaleFL": 1e5,
+        "scaleFL": 10e4,
         "scaleOP0": 10,
         "scaleOP1": 1,
         "scaleDF": 1,

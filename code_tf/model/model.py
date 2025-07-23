@@ -4,7 +4,9 @@ from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, M
 from keras import metrics
 import keras
 import tensorflow as tf
+from keras.saving import register_keras_serializable
 
+@register_keras_serializable()
 def non_zero_mae(y_true, y_pred):
     mask = tf.not_equal(y_true, 0.0)
     err  = tf.abs(y_true - y_pred)
