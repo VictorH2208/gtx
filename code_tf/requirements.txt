@@ -2,7 +2,6 @@ boto3
 botocore
 dicttoxml
 h5py
-keras
 mat73
 matplotlib
 numpy

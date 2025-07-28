@@ -6,6 +6,7 @@ model/
 
 code_tf/ckpt/
 code_tf/sagemaker_ckpts/
+code_tf/aws_ckpt/
 
 code_py/ckpt/
 code_py/sagemaker_ckpts/

@@ -68,7 +68,7 @@ def get_arg_parser():
     parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
 
     # Data path
-    parser.add_argument('--data_path', type=str, default='../data/20241118_data_splited.mat')
+    parser.add_argument('--data_path', type=str, default='../data/20241118_data_split_2333.mat')
     parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
     return parser
 
@@ -104,7 +104,7 @@ class CustomModelCheckpoint(tf.keras.callbacks.Callback):
             if self.verbose:
                 print(f"Epoch {epoch}: {self.monitor} improved from {self.best:.5f} to {current:.5f}, saving model to {self.filepath}")
             self.best = current
-            self.model.save(self.filepath)
+            self.model.export(os.path.join(self.filepath, f'model_ckpt'))
 
 def train(params):
 
@@ -119,7 +119,7 @@ def train(params):
     }
 
     if params['sagemaker']:
-        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_splited.mat')
+        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_split_2333.mat')
         data = load_data(filepath, scale_params)
     else:
         data = load_data(params['data_path'], scale_params)
@@ -130,14 +130,9 @@ def train(params):
     train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)
     train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     train_depth = train_data['depth']
+    train_depth[train_depth == 0] = 10
     train_concentration_fluor = train_data['concentration_fluor']
     train_reflectance = train_data['reflectance']
-
-    print(train_fluorescence.shape)
-    print(train_op.shape)
-    print(train_depth.shape)
-    print(train_concentration_fluor.shape)
-    print(train_reflectance.shape)
 
     train_dataset = tf.data.Dataset.from_tensor_slices((
         (train_op, train_fluorescence),  # tuple of inputs
@@ -155,6 +150,7 @@ def train(params):
     val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)
     val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     val_depth = val_data['depth']
+    val_depth[val_depth == 0] = 10
     val_concentration_fluor = val_data['concentration_fluor']
     val_reflectance = val_data['reflectance']
 
@@ -174,6 +170,7 @@ def train(params):
     test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)
     test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     test_depth = test_data['depth']
+    test_depth[test_depth == 0] = 10
     test_concentration_fluor = test_data['concentration_fluor']
     test_reflectance = test_data['reflectance']
 
@@ -198,17 +195,17 @@ def train(params):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if params['sagemaker']:
-        model_dir = '/opt/ml/model'
+        model_dir = f'/opt/ml/model'
     else:
         model_dir = params['model_dir']
         os.makedirs(model_dir, exist_ok=True)
 
     checkpoint = CustomModelCheckpoint(
-        filepath=os.path.join(model_dir, f'model_ckpt_{timestamp}.keras'),
+        filepath=model_dir,
         monitor='val_loss',
         verbose=1
     )
-    csv_logger = tf.keras.callbacks.CSVLogger(os.path.join(model_dir, f'loss_{timestamp}.log'), append=True)
+    csv_logger = tf.keras.callbacks.CSVLogger(os.path.join(model_dir, f'loss.log'), append=True)
     callbacks = [lr_scheduler, early_stopping, batch_logger, checkpoint, csv_logger]
     
 
@@ -222,11 +219,11 @@ def train(params):
     )
     
 
-    model.load_model(os.path.join(model_dir, f'model_ckpt_{timestamp}.keras'))
-    model.model.evaluate(
-        test_dataset,
-        verbose=1
-    )
+    # model.load_model(os.path.join(model_dir, f'model_ckpt'))
+    # model.model.evaluate(
+    #     test_dataset,
+    #     verbose=1
+    # )
 
         
 if __name__ == "__main__":
