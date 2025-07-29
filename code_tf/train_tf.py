@@ -105,8 +105,8 @@ class CustomModelCheckpoint(tf.keras.callbacks.Callback):
                 print(f"Epoch {epoch}: {self.monitor} improved from {self.best:.5f} to {current:.5f}, saving models...")
             self.best = current
 
-            # legacy_path = os.path.join(self.filepath, 'model_ckpt_tf')
-            # self.model.save(legacy_path, save_format='tf')
+            legacy_path = os.path.join(self.filepath, 'model_ckpt_tf')
+            self.model.save(legacy_path, save_format='tf')
 
             export_path = os.path.join(self.filepath, 'model_ckpt')
             self.model.export(export_path)
@@ -224,11 +224,11 @@ def train(params):
     )
     
 
-    # model.load_model(os.path.join(model_dir, f'model_ckpt_tf'))
-    # model.model.evaluate(
-    #     test_dataset,
-    #     verbose=1
-    # )
+    model.load_model(os.path.join(model_dir, f'model_ckpt_tf'))
+    model.model.evaluate(
+        test_dataset,
+        verbose=1
+    )
 
         
 if __name__ == "__main__":
