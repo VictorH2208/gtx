@@ -2,7 +2,7 @@
 
 ## Dataset
 
-* Download dataset by running the load_data notebook and move to the `/data` folder
+* Download dataset by running the load_data notebook (from AWS S3) and move to the `/data` folder
 
 ## TensorFlow version
 

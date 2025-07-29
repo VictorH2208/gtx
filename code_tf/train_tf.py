@@ -68,7 +68,7 @@ def get_arg_parser():
     parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
 
     # Data path
-    parser.add_argument('--data_path', type=str, default='../data/20241118_data_split_2333.mat')
+    parser.add_argument('--data_path', type=str, default='../data/20241118_data_splited.mat')
     parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
     return parser
 
@@ -104,7 +104,8 @@ class CustomModelCheckpoint(tf.keras.callbacks.Callback):
             if self.verbose:
                 print(f"Epoch {epoch}: {self.monitor} improved from {self.best:.5f} to {current:.5f}, saving model to {self.filepath}")
             self.best = current
-            self.model.export(os.path.join(self.filepath, f'model_ckpt'))
+            self.model.export(os.path.join(self.filepath, f'model_ckpt_new'))
+            self.model.save(os.path.join(self.filepath, f'model_ckpt'))
 
 def train(params):
 
@@ -119,7 +120,7 @@ def train(params):
     }
 
     if params['sagemaker']:
-        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_split_2333.mat')
+        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_splited.mat')
         data = load_data(filepath, scale_params)
     else:
         data = load_data(params['data_path'], scale_params)
@@ -219,11 +220,11 @@ def train(params):
     )
     
 
-    # model.load_model(os.path.join(model_dir, f'model_ckpt'))
-    # model.model.evaluate(
-    #     test_dataset,
-    #     verbose=1
-    # )
+    model.load_model(os.path.join(model_dir, f'model_ckpt'))
+    model.model.evaluate(
+        test_dataset,
+        verbose=1
+    )
 
         
 if __name__ == "__main__":
