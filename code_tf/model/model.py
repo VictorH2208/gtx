@@ -5,16 +5,16 @@ import tensorflow as tf
 from tensorflow.keras.saving import register_keras_serializable
 from tensorflow.keras.models import model_from_json
 
-# @register_keras_serializable()
-# def tumor_mae(y_true, y_pred):
-#     mask = tf.not_equal(y_true, 0.0)
-#     err  = tf.abs(y_true - y_pred)
-#     masked_err = tf.boolean_mask(err, mask)
-#     return tf.cond(
-#         tf.size(masked_err) > 0,
-#         lambda: tf.reduce_mean(masked_err),
-#         lambda: tf.constant(0.0)
-#     ) 
+@register_keras_serializable()
+def tumor_mae(y_true, y_pred):
+    mask = tf.not_equal(y_true, 0.0)
+    err  = tf.abs(y_true - y_pred)
+    masked_err = tf.boolean_mask(err, mask)
+    return tf.cond(
+        tf.size(masked_err) > 0,
+        lambda: tf.reduce_mean(masked_err),
+        lambda: tf.constant(0.0)
+    ) 
 
 class ModelInit():  
 
@@ -182,7 +182,7 @@ class ModelInit():
             optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
             metrics={
                 'outQF': metrics.MeanAbsoluteError(name='mae_qf'),
-                'outDF': metrics.MeanAbsoluteError(name='mae_df')
+                'outDF': [metrics.MeanAbsoluteError(name='mae_df'), tumor_mae]
             }
         )
         
