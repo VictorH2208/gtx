@@ -132,7 +132,7 @@ def train(params):
     train_data = data['train']
     train_fluorescence = train_data['fluorescence']
     # train_fluorescence = np.transpose(train_fluorescence, (0, 3, 1, 2))
-    train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)
+    train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)[...,:4,:]
     train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     train_depth = train_data['depth']
     train_depth[train_depth == 0] = 10
@@ -154,7 +154,7 @@ def train(params):
     val_data = data['val']
     val_fluorescence = val_data['fluorescence']
     # val_fluorescence = np.transpose(val_fluorescence, (0, 3, 1, 2))
-    val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)
+    val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)[...,:4,:]
     val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     val_depth = val_data['depth']
     val_depth[val_depth == 0] = 10
@@ -176,7 +176,7 @@ def train(params):
     test_data = data['test']
     test_fluorescence = test_data['fluorescence']
     # test_fluorescence = np.transpose(test_fluorescence, (0, 3, 1, 2))
-    test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)
+    test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)[...,:4,:]
     test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     test_depth = test_data['depth']
     test_depth[test_depth == 0] = 10

@@ -18,7 +18,7 @@ estimator = TensorFlow(
         "activation": "relu",
         "optimizer": "Adam",
         "epochs": 100,
-        "nF": 6,
+        "nF": 4,
         "learningRate": 5e-4,
         "batch": 32,
         "xX": 101,
