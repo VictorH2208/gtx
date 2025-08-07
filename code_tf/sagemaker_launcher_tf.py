@@ -17,7 +17,7 @@ estimator = TensorFlow(
         "sagemaker": True,
         "activation": "relu",
         "optimizer": "Adam",
-        "epochs": 1,
+        "epochs": 100,
         "nF": 6,
         "learningRate": 5e-4,
         "batch": 32,
