@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from model.model_single_input import ModelInit
+from model.model import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime

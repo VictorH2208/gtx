@@ -1,6 +1,6 @@
 import os
-os.chdir('/home/victorhuang/projects/gtx')
-# os.chdir('/home/victorh/projects/gtx')
+# os.chdir('/home/victorhuang/projects/gtx')
+os.chdir('/home/victorh/projects/gtx')
 
 import numpy as np
 import mat73
