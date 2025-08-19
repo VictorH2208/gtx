@@ -46,28 +46,28 @@ class ModelInit():
         ## Optical Properties Branch ##
         inOP = Conv2D(filters=self.params['nFilters2D']//2, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
                 padding='same', activation=self.params['activation'], data_format="channels_last")(inOP_beg)
-        # inOP = Dropout(0.5)(inOP)
+        # inOP = Dropout(0.75)(inOP)
 
         inOP = Conv2D(filters=int(self.params['nFilters2D']/2), kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
                 padding='same', activation=self.params['activation'], data_format="channels_last")(inOP)
-        # inOP = Dropout(0.5)(inOP)
+        # inOP = Dropout(0.75)(inOP)
         
         inOP = Conv2D(filters=int(self.params['nFilters2D']/2), kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
                 padding='same', activation=self.params['activation'], data_format="channels_last")(inOP)
-        # inOP = Dropout(0.5)(inOP)  
+        # inOP = Dropout(0.75)(inOP)  
 
         ## Fluorescence Input Branch ##
         input_shape = inFL_beg.shape
         inFL = Conv3D(filters=self.params['nFilters3D']//2, kernel_size=self.params['kernelConv3D'], strides=self.params['strideConv3D'], 
                 padding='same', activation=self.params['activation'], input_shape=input_shape[1:], data_format="channels_last")(inFL_beg)
-        # inFL = Dropout(0.5)(inFL)
+        # inFL = Dropout(0.75)(inFL)
 
         inFL = Conv3D(filters=int(self.params['nFilters3D']/2), kernel_size=self.params['kernelConv3D'], strides=self.params['strideConv3D'], 
                 padding='same', activation=self.params['activation'], data_format="channels_last")(inFL)
-        # inFL = Dropout(0.5)(inFL)
+        # inFL = Dropout(0.75)(inFL)
         inFL = Conv3D(filters=int(self.params['nFilters3D']/2), kernel_size=self.params['kernelConv3D'], strides=self.params['strideConv3D'], 
                 padding='same', activation=self.params['activation'], data_format="channels_last")(inFL)
-        # inFL = Dropout(0.5)(inFL)
+        # inFL = Dropout(0.75)(inFL)
 
         ## Concatenate Branch ##
         # inFL = Permute((2, 3, 1, 4))(inFL)
