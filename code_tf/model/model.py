@@ -1,9 +1,11 @@
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation, Permute
-from tensorflow.keras import metrics
 import tensorflow as tf
-from tensorflow.keras.saving import register_keras_serializable
-from tensorflow.keras.models import model_from_json
+
+import keras
+from keras.models import Model, load_model
+from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation, Permute
+from keras import metrics
+from keras.saving import register_keras_serializable
+from keras.models import model_from_json
 
 @register_keras_serializable()
 def tumor_mae(y_true, y_pred):
@@ -145,27 +147,30 @@ class ModelInit():
 
         Conv_6 = Conv2D(filters=128, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
                 activation=self.params['activation'], data_format="channels_last")(concat_3)
-
-        ## Quantitative Fluorescence Output Branch ##
-        outQF = Conv2D(filters=64, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                activation=self.params['activation'], data_format="channels_last")(Conv_6)
-
-        outQF = Conv2D(filters=32, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                activation=self.params['activation'], data_format="channels_last")(outQF) #outQF
         
-        outQF = Conv2D(filters=1, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                        data_format="channels_last", name='outQF')(outQF)
+        # Quantitative Fluorescence head (QF)
+        qf = Conv2D(64, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'],
+                data_format="channels_last")(Conv_6)
+        qf = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'],
+                data_format="channels_last")(qf)
+        qf = Conv2D(1, (1, 1), (1, 1), padding='same', activation=None,
+                data_format="channels_last", name='outQF_logits')(qf)
+        outQF = keras.layers.Reshape((self.params['yY'], self.params['xX']), name='outQF')(qf)
 
-        ## Depth Fluorescence Output Branch ##
-        #first DF layer 
-        outDF = Conv2D(filters=64, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                activation=self.params['activation'], data_format="channels_last")(Conv_6)
+        # Depth head (DF)
+        df = Conv2D(64, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'],
+                data_format="channels_last")(Conv_6)
+        df = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'],
+                data_format="channels_last")(df)
+        df = Conv2D(1, (1, 1), (1, 1), padding='same', activation=None,
+                data_format="channels_last", name='outDF_logits')(df)
+        outDF = keras.layers.Reshape((self.params['yY'], self.params['xX']), name='outDF')(df)
 
-        outDF = Conv2D(filters=32, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                activation=self.params['activation'], data_format="channels_last")(outDF)
-        
-        outDF = Conv2D(filters=1, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                data_format="channels_last", name='outDF')(outDF)
+
 
         ## Defining and compiling the model ##
 
@@ -185,6 +190,11 @@ class ModelInit():
         return None
     
     def load_model(self, model_path):
-        self.model = tf.keras.models.load_model(model_path)
+        self.model = load_model(model_path)
+
+        return None
+    
+    def save_model(self, model_path):
+        self.model.save(model_path)
 
         return None

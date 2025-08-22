@@ -1,28 +1,119 @@
 import os
 import sys
+
+os.environ["KERAS_BACKEND"] = "tensorflow" 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 0 = all logs, 1 = filter INFO, 2 = filter INFO+WARNING, 3 = only ERRORs
+
+import logging
+logging.basicConfig(level=logging.INFO) 
+logger = logging.getLogger(__name__)
+
 import argparse
 import numpy as np
+from model.model import ModelInit
+from tqdm import tqdm
 import tensorflow as tf
+from datetime import datetime
+import keras
+from keras import callbacks, optimizers
+from preprocess import load_data
 
-from code_tf.model.model import ModelInit
-from utils.preprocess.dt_data_preprocess import load_data
+np.random.seed(1024)
+tf.random.set_seed(1024)
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        print(gpus)
+        tf.config.set_visible_devices(gpus[0], 'GPU')
+        tf.config.experimental.set_memory_growth(gpus[0], True)
+    except RuntimeError as e:
+        print(e)
 
 def get_arg_parser():
-    parser = argparse.ArgumentParser(description="Eval script for fluorescence imaging model.")
-    parser.add_argument('--model_path', type=str, required=True, help='Path to saved .keras model')
-    parser.add_argument('--data_path', type=str, required=True, help='Path to test .mat data')
-    
-    parser.add_argument('--scaleFL', type=float, default=10e4)
-    parser.add_argument('--scaleOP0', type=float, default=10)
-    parser.add_argument('--scaleOP1', type=float, default=1)
-    parser.add_argument('--scaleDF', type=float, default=1)
-    parser.add_argument('--scaleQF', type=float, default=1)
-    parser.add_argument('--scaleRE', type=float, default=1)
-    parser.add_argument('--batch', type=int, default=32)
+    parser = argparse.ArgumentParser(description="Hyperparameter configuration for fluorescence imaging model.")
+
+    parser.add_argument('--sagemaker', type=bool, default=False, help='SageMaker mode')
+
+    # General hyperparameters
+    parser.add_argument('--activation', type=str, default='relu', help='Activation function')
+    parser.add_argument('--optimizer', type=str, default='Adam', help='Optimizer name')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of training epochs')
+    parser.add_argument('--nF', type=int, default=6, help='Number of fluroescent spatial frequencies (fluorescent images)')
+    parser.add_argument('--learningRate', type=float, default=5e-4, help='Learning rate')
+    parser.add_argument('--batch', type=int, default=32, help='Batch size')
+    parser.add_argument('--xX', type=int, default=101, help='Image width')
+    parser.add_argument('--yY', type=int, default=101, help='Image height')
+    parser.add_argument('--decayRate', type=float, default=0.3, help='Learning rate decay factor')
+    parser.add_argument('--patience', type=int, default=20, help='Early stopping patience')
+
+    # Scaling parameters
+    parser.add_argument('--scaleFL', type=float, default=10e4, help='Scaling factor for fluorescence')
+    parser.add_argument('--scaleOP0', type=float, default=10, help='Scaling for absorption coefficient (μa)')
+    parser.add_argument('--scaleOP1', type=float, default=1, help='Scaling for scattering coefficient (μs)')
+    parser.add_argument('--scaleDF', type=float, default=1, help='Scaling for depth')
+    parser.add_argument('--scaleQF', type=float, default=1, help='Scaling for fluorophore concentration')
+    parser.add_argument('--scaleRE', type=float, default=1, help='Scaling for reflectance (optional)')
+
+    # 3D Conv parameters
+    parser.add_argument('--nFilters3D', type=int, default=128)
+    parser.add_argument('--kernelConv3D', type=int, nargs=3, default=[3,3,3])
+    parser.add_argument('--strideConv3D', type=int, nargs=3, default=[1,1,1])
+
+    # 2D Conv parameters
+    parser.add_argument('--nFilters2D', type=int, default=128)
+    parser.add_argument('--kernelConv2D', type=int, nargs=2, default=[3,3])
+    parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
+
+    # Data path
+    parser.add_argument('--data_path', type=str)
+    parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
     return parser
 
-def eval(params):
-    # This is to evaluate the phantom and monte carlo simulated data
+class BatchLogger(callbacks.Callback):
+    def __init__(self, log_interval=50, num_samples=None, batch_size=None):
+        super().__init__()
+        self.log_interval = log_interval
+        self.total_batches = num_samples // batch_size
+
+    def on_train_batch_end(self, batch, logs=None):
+        if batch % self.log_interval == 0:
+            loss = logs.get('loss')
+            logging.info(f"[Batch {batch}/{self.total_batches}] Loss: {loss:.4f}")
+
+    def on_epoch_end(self, epoch, logs=None):
+        logging.info(
+            f"Epoch {epoch}: "
+            + ", ".join([f"{k} = {v:.4f}" for k, v in logs.items() if isinstance(v, float)])
+        )
+
+class CustomModelCheckpoint(callbacks.Callback):
+    def __init__(self, filepath, monitor='val_loss', verbose=1):
+        super().__init__()
+        self.filepath = filepath
+        self.monitor = monitor
+        self.best = float('inf')
+        self.verbose = verbose
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        current = logs.get(self.monitor)
+        if current is not None and current < self.best:
+            if self.verbose:
+                print(f"Epoch {epoch}: {self.monitor} improved from {self.best:.5f} to {current:.5f}, saving models...")
+            self.best = current
+
+            # legacy_path = os.path.join(self.filepath, 'model_ckpt_tf')
+            # self.model.save(legacy_path, save_format='tf')
+
+            # export_path = os.path.join(self.filepath, 'model_ckpt')
+            # self.model.export(export_path)
+            path = os.path.join(self.filepath, 'model.keras')
+            self.model.save(path)
+
+def train(params):
+
+    # Load data
     scale_params = {
         'fluorescence': params['scaleFL'],
         'mu_a': params['scaleOP0'],
@@ -32,52 +123,86 @@ def eval(params):
         'reflectance': params['scaleRE']
     }
 
-    # Load the data. TODO： adapt to the monte carlo and phantom data
-    data = load_data(params['data_path'], scale_params) 
+    if params['sagemaker']:
+        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_splited.mat')
+        data = load_data(filepath, scale_params)
+    else:
+        data = load_data(params['data_path'], scale_params)
 
-    fluorescence = data['fluorescence']
-    fluorescence = np.transpose(fluorescence, (0, 3, 1, 2))
-    op = np.stack([data['mu_a'], data['mu_s']], axis=1)
-    op = np.transpose(op, (0, 2, 3, 1))
-    depth = data['depth']
-    concentration_fluor = data['concentration_fluor']
-    reflectance = data['reflectance']
+    train_data = data['train']
+    train_fluorescence = train_data['fluorescence']
+    # train_fluorescence = np.transpose(train_fluorescence, (0, 3, 1, 2))
+    train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)
+    train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
+    train_depth = train_data['depth']
+    train_depth[train_depth == 0] = 10
+    # train_mask = (train_data['depth'] != 0).astype(int)
+    train_concentration_fluor = train_data['concentration_fluor']
+    # train_concentration_fluor = train_mask
+    train_reflectance = train_data['reflectance']
 
-    phantom_dataset = tf.data.Dataset.from_tensor_slices(
-        (op, fluorescence),
-        {'outQF': concentration_fluor, 'outDF': depth, 'outReflect': reflectance}
-    )
-    phantom_dataset = phantom_dataset.batch(params['batch'])
+    train_dataset = tf.data.Dataset.from_tensor_slices((
+        (train_op, train_fluorescence),  # tuple of inputs
+        {'outDF': train_depth, 'outQF': train_concentration_fluor}  # dict of outputs
+    ))
+    # train_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (train_op, train_fluorescence),  # tuple of inputs
+    #     {'outQF': train_concentration_fluor, 'outDF': train_depth, 'outReflect': train_reflectance}  # dict of outputs
+    # ))
+    train_dataset = train_dataset.shuffle(buffer_size=1000, seed=1024, reshuffle_each_iteration=False).batch(params['batch'])
 
-    # Load the model
-    print(f"Loading model from {params['model_path']}")
-    model = tf.keras.models.load_model(params['model_path'])
+    val_data = data['val']
+    val_fluorescence = val_data['fluorescence']
+    # val_fluorescence = np.transpose(val_fluorescence, (0, 3, 1, 2))
+    val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)
+    val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
+    val_depth = val_data['depth']
+    val_depth[val_depth == 0] = 10
+    # val_mask = (val_data['depth'] != 0).astype(int)
+    val_concentration_fluor = val_data['concentration_fluor']
+    # val_concentration_fluor = val_mask
+    val_reflectance = val_data['reflectance']
 
-    # Evaluate
-    results = model.evaluate(
-        phantom_dataset,
-        verbose=1
-    ) # Three outputs: loss, outQF, outDF, outReflect
+    val_dataset = tf.data.Dataset.from_tensor_slices((
+        (val_op, val_fluorescence),  # tuple of inputs
+        {'outDF': val_depth, 'outQF': val_concentration_fluor}  # dict of outputs
+    ))
+    # val_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (val_op, val_fluorescence),  # tuple of inputs
+    #     {'outQF': val_concentration_fluor, 'outDF': val_depth, 'outReflect': val_reflectance}  # dict of outputs
+    # ))
+    val_dataset = val_dataset.batch(params['batch'])
 
-    print("\nEvaluation results:")
-    results_dict = {
-        'val_loss': results[0],
-        'val_outQF': results[1],
-        'val_outDF': results[2],
-        'val_outReflect': results[3]
-    }
-    print(results_dict)
+    test_data = data['test']
+    test_fluorescence = test_data['fluorescence']
+    # test_fluorescence = np.transpose(test_fluorescence, (0, 3, 1, 2))
+    test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)
+    test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
+    test_depth = test_data['depth']
+    test_depth[test_depth == 0] = 10
+    # test_mask = (test_data['depth'] != 0).astype(int)
+    test_concentration_fluor = test_data['concentration_fluor']
+    # test_concentration_fluor = test_mask
+    test_reflectance = test_data['reflectance']
 
-    # Optionally: save predictions for later analysis
-    # predictions = model.predict([op, fluorescence], batch_size=params['batch'])
-    # np.savez("eval_preds.npz", **predictions)
+    test_dataset = tf.data.Dataset.from_tensor_slices((
+        (test_op, test_fluorescence),  # tuple of inputs
+        {'outDF': test_depth, 'outQF': test_concentration_fluor}  # dict of outputs
+    ))
+    # test_dataset = tf.data.Dataset.from_tensor_slices((
+    #     (test_op, test_fluorescence),  # tuple of inputs
+    #     {'outQF': test_concentration_fluor, 'outDF': test_depth, 'outReflect': test_reflectance}  # dict of outputs
+    # ))
+    test_dataset = test_dataset.batch(params['batch'])
+
+    # Initialize model
+    model = ModelInit(params)
+    model.build_model()
+
+    model.save_model("model.keras")
 
 if __name__ == "__main__":
     parser = get_arg_parser()
     args = parser.parse_args()
     params = vars(args)
-
-    np.random.seed(1024)
-    tf.random.set_seed(1024)
-
-    eval(params)
+    train(params)

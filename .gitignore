@@ -12,3 +12,5 @@ code_py/sagemaker_ckpts/
 
 code_kan/model/
 code_kan/figures/
+
+**/*.tar.gz
