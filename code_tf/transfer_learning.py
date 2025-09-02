@@ -7,7 +7,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 0 = all logs, 1 = filter INFO, 2 = f
 import logging
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
-
 import argparse
 import numpy as np
 from tqdm import tqdm
@@ -18,7 +17,6 @@ from keras import callbacks, optimizers, metrics
 from keras.saving import register_keras_serializable
 
 from preprocess import load_data
-
 
 np.random.seed(1024)
 tf.random.set_seed(1024)
@@ -85,7 +83,7 @@ def get_arg_parser():
     parser.add_argument('--model_dir', type=str, required=True)
     parser.add_argument('--data_path', type=str, required=True)
     parser.add_argument('--is_aws', type=bool, default=False)
-    parser.add_argument('--names_to_train', type=list, required=True)
+    parser.add_argument('--names_to_train', type=str, required=True)
     parser.add_argument('--batch', type=int, required=True)
     parser.add_argument('--epochs', type=int, required=True)
     parser.add_argument('--learningRate', type=float, required=True)
@@ -125,19 +123,22 @@ def transfer_learning(params):
         'reflectance': params['scaleRE']
     }
 
-    model = load_model(model_path)
+    if is_aws:
+        filepath = os.path.join('/opt/ml/input/data/training', data_path)
+        model_ckpt = os.path.join('/opt/ml/input/data/ckpt', model_path)
+        data = load_data(filepath, scale_params)
+    else:
+        data_path = os.path.join('../data', data_path)
+        data = load_data(data_path, scale_params)
+    
+    model = load_model(model_ckpt)
 
     for l in model.layers: l.trainable = False
 
+    # print(names_to_train)
     for l in model.layers:
         if l.name in names_to_train:
             l.trainable = True
-
-    if is_aws:
-        filepath = os.path.join('/opt/ml/input/data/training', data_path)
-        data = load_data(filepath, scale_params)
-    else:
-        data = load_data(data_path, scale_params)
 
     train_data = data['train']
     train_fluorescence = train_data['fluorescence']
@@ -219,12 +220,12 @@ def transfer_learning(params):
         train_dataset,
         validation_data=val_dataset,
         epochs=epochs,
-        verbose=1,
+        verbose=0,
         callbacks=cb
     )
 
-    model.load_model(os.path.join(model_dir, f'model.keras'))
-    model.evaluate(
+    eval_model = keras.models.load_model(os.path.join(model_dir, f'model.keras'))
+    eval_model.evaluate(
         test_dataset,
         verbose=1
     )
@@ -233,6 +234,9 @@ if __name__ == '__main__':
     parser = get_arg_parser()
     args = parser.parse_args()
     params = vars(args)
+    
+    names_to_train = [name.strip() for name in params['names_to_train'].split(',')]
+    params['names_to_train'] = names_to_train
 
     np.random.seed(1024)
     tf.random.set_seed(1024)

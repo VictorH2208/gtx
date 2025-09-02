@@ -40,7 +40,7 @@ estimator = TensorFlow(
     },
     output_path='s3://20250509-victor/tf_model_output/'
 )
-job_name = f'tf-model-output-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+job_name = f'model-output-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 inputs = {
     'training': 's3://20250509-victor/python_training_data_sim/20250822_mcx_sujit_100scale_splited.mat',
 }
