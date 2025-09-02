@@ -70,7 +70,7 @@ def get_arg_parser():
     parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
 
     # Data path
-    parser.add_argument('--data_path', type=str, default='../data/20241118_data_splited.mat')
+    parser.add_argument('--data_path', type=str, default='../data/20250822_mcx_sujit_100scale_splited.mat')
     parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
     return parser
 
@@ -129,7 +129,7 @@ def train(params):
     }
 
     if params['sagemaker']:
-        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_splited.mat')
+        filepath = os.path.join('/opt/ml/input/data/training', '20250822_mcx_sujit_100scale_splited.mat')
         data = load_data(filepath, scale_params)
     else:
         data = load_data(params['data_path'], scale_params)
