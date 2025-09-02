@@ -208,7 +208,6 @@ def train(params):
     lr_scheduler = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=params['decayRate'], patience=5, verbose=1, min_lr=5e-5)
     early_stopping = callbacks.EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=params['patience'], verbose=1, mode='auto')
     batch_logger = BatchLogger(log_interval=20, num_samples= int(train_fluorescence.shape[0]), batch_size=params['batch'])
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if params['sagemaker']:
         model_dir = f'/opt/ml/model'

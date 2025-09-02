@@ -82,7 +82,23 @@ class CustomModelCheckpoint(callbacks.Callback):
 def get_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, required=True)
+    parser.add_argument('--model_dir', type=str, required=True)
+    parser.add_argument('--data_path', type=str, required=True)
     parser.add_argument('--is_aws', type=bool, default=False)
+    parser.add_argument('--names_to_train', type=list, required=True)
+    parser.add_argument('--batch', type=int, required=True)
+    parser.add_argument('--epochs', type=int, required=True)
+    parser.add_argument('--learningRate', type=float, required=True)
+    parser.add_argument('--decayRate', type=float, required=True)
+    parser.add_argument('--patience', type=int, required=True)
+
+    parser.add_argument('--scaleFL', type=float, required=True)
+    parser.add_argument('--scaleOP0', type=float, required=True)
+    parser.add_argument('--scaleOP1', type=float, required=True)
+    parser.add_argument('--scaleDF', type=float, required=True)
+    parser.add_argument('--scaleQF', type=float, required=True)
+    parser.add_argument('--scaleRE', type=float, required=True)
+    
     return parser
 
 def load_model(model_path):
@@ -95,15 +111,19 @@ def transfer_learning(params):
     data_path = params['data_path']
     names_to_train = params['names_to_train']
     is_aws = params['is_aws']
-    scale_params = params['scale_params']
     batch = params['batch']
     epochs = params['epochs']
     learning_rate = params['learningRate']
     decay_rate = params['decayRate']
     patience = params['patience']
-    nF = params['nF']
-    xX = params['xX']
-    yY = params['yY']
+    scale_params = {
+        'fluorescence': params['scaleFL'],
+        'mu_a': params['scaleOP0'],
+        'mu_s': params['scaleOP1'],
+        'depth': params['scaleDF'],
+        'concentration_fluor': params['scaleQF'],
+        'reflectance': params['scaleRE']
+    }
 
     model = load_model(model_path)
 
@@ -167,7 +187,6 @@ def transfer_learning(params):
     lr_scheduler = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=decay_rate, patience=patience, verbose=1, min_lr=1e-6)
     early_stopping = callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5, patience=patience, verbose=1, mode='auto')
     batch_logger = BatchLogger(log_interval=20, num_samples= int(train_fluorescence.shape[0]), batch_size=batch)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if is_aws:
         model_dir = f'/opt/ml/model'

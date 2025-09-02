@@ -22,13 +22,6 @@ SCALE_DF=1
 SCALE_QF=1
 SCALE_RE=1
 
-FILTERS_3D=128
-KERNEL_3D="3 3 3"
-STRIDE_3D="1 1 1"
-
-FILTERS_2D=128
-KERNEL_2D="3 3"
-STRIDE_2D="1 1"
 
 DATA_PATH="../data/20241118_data_splited.mat"
 # === Run training ===
