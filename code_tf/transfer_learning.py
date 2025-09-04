@@ -84,6 +84,7 @@ def get_arg_parser():
     parser.add_argument('--data_path', type=str, required=True)
     parser.add_argument('--is_aws', type=bool, default=False)
     parser.add_argument('--names_to_train', type=str, required=True)
+    parser.add_argument('--train_subset', type=int, required=8000)
     parser.add_argument('--batch', type=int, required=True)
     parser.add_argument('--epochs', type=int, required=True)
     parser.add_argument('--learningRate', type=float, required=True)
@@ -108,6 +109,7 @@ def transfer_learning(params):
     model_path = params['model_path']
     data_path = params['data_path']
     names_to_train = params['names_to_train']
+    train_subset = params['train_subset']
     is_aws = params['is_aws']
     batch = params['batch']
     epochs = params['epochs']
@@ -129,6 +131,7 @@ def transfer_learning(params):
         data = load_data(filepath, scale_params)
     else:
         data_path = os.path.join('../data', data_path)
+        model_ckpt = model_path
         data = load_data(data_path, scale_params)
     
     model = load_model(model_ckpt)
@@ -149,11 +152,22 @@ def transfer_learning(params):
     train_concentration_fluor = train_data['concentration_fluor']
     train_reflectance = train_data['reflectance']
 
+    N = train_fluorescence.shape[0]
+    if train_subset and 0 < train_subset < N:
+        rng = np.random.RandomState(1024)
+        idx = rng.choice(N, size=train_subset, replace=False)
+        train_fluorescence       = train_fluorescence[idx]
+        train_op                  = train_op[idx]
+        train_depth               = train_depth[idx]
+        train_concentration_fluor = train_concentration_fluor[idx]
+        train_reflectance         = train_reflectance[idx]
+
     train_dataset = tf.data.Dataset.from_tensor_slices((
         (train_op, train_fluorescence),  # tuple of inputs
         {'outDF': train_depth, 'outQF': train_concentration_fluor}  # dict of outputs
     ))
     train_dataset = train_dataset.shuffle(buffer_size=1000, seed=1024, reshuffle_each_iteration=False).batch(batch)
+    print("Fuc", train_fluorescence.shape)
 
     val_data = data['val']
     val_fluorescence = val_data['fluorescence']
