@@ -50,6 +50,7 @@ def get_arg_parser():
     parser.add_argument('--yY', type=int, default=101, help='Image height')
     parser.add_argument('--decayRate', type=float, default=0.3, help='Learning rate decay factor')
     parser.add_argument('--patience', type=int, default=20, help='Early stopping patience')
+    parser.add_argument('--normalize', type=bool, default=False, help='Normalize data')
 
     # Scaling parameters
     parser.add_argument('--scaleFL', type=float, default=10e4, help='Scaling factor for fluorescence')
@@ -70,7 +71,7 @@ def get_arg_parser():
     parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
 
     # Data path
-    parser.add_argument('--data_path', type=str, default='../data/20250822_mcx_sujit_100scale_splited.mat')
+    parser.add_argument('--data_path', type=str, default='../data/20241118_data_splited.mat')
     parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
     return parser
 
@@ -129,10 +130,10 @@ def train(params):
     }
 
     if params['sagemaker']:
-        filepath = os.path.join('/opt/ml/input/data/training', '20250822_mcx_sujit_100scale_splited.mat')
-        data = load_data(filepath, scale_params)
+        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_splited.mat')
+        data = load_data(filepath, scale_params, params['normalize'])
     else:
-        data = load_data(params['data_path'], scale_params)
+        data = load_data(params['data_path'], scale_params, params['normalize'])
 
     train_data = data['train']
     train_fluorescence = train_data['fluorescence']

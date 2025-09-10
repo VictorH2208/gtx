@@ -7,20 +7,38 @@ def scale_data(data_dict, params):
         scaled_data_dict[key] = items * params[key]
     return scaled_data_dict
 
-def normalization(fluorescence, optical_props):
-    f = (fluorescence - np.mean(fluorescence, axis=(1,2,3), keepdims=True)) / \
-                   (np.std(fluorescence, axis=(1,2,3), keepdims=True) + 1e-6)
-    mu_a = optical_props[..., 0]
-    mu_s = optical_props[..., 1]
+def get_channel_min_max(data):
+    """
+    Get per-channel min and max values across the entire dataset.
 
-    mu_a_mean = np.mean(mu_a, axis=(1,2), keepdims=True)
-    mu_a_std = np.std(mu_a, axis=(1,2), keepdims=True)
-    mu_a_norm = (mu_a - mu_a_mean) / (mu_a_std + 1e-6)
+    Args:
+        data: numpy array of shape (N, H, W, C)
 
-    mu_s_mean = np.mean(mu_s, axis=(1,2), keepdims=True)
-    mu_s_std = np.std(mu_s, axis=(1,2), keepdims=True)
-    mu_s_norm = (mu_s - mu_s_mean) / (mu_s_std + 1e-6)
-    return f, mu_a_norm, mu_s_norm
+    Returns:
+        list of (min, max) for each channel
+    """
+    n_channels = data.shape[-1]
+    results = []
+    for ch in range(n_channels):
+        channel_data = data[..., ch]
+        channel_data = channel_data[channel_data > 0]
+        ch_min = np.min(channel_data)
+        ch_max = np.max(channel_data)
+        results.append((ch_min, ch_max))
+    return results
+
+def minmax_normalize(data, mins_maxs):
+    """
+    Normalize (N, H, W, C) array channel-wise using given min/max list.
+    Keeps zeros as zeros (background).
+    """
+    out = data.copy()
+    C = data.shape[-1]
+    for ch in range(C):
+        mn, mx = mins_maxs[ch]
+        mask = out[..., ch] != 0  # ignore background
+        out[..., ch][mask] = (out[..., ch][mask] - mn) / (mx - mn)
+    return out
 
 def load_split_data(file_path):
     data = sio.loadmat(file_path)
@@ -38,7 +56,7 @@ def load_split_data(file_path):
 
     return data_by_split
 
-def load_data(file_path, scale_params):
+def load_data(file_path, scale_params, normalize=False):
     data_by_split = load_split_data(file_path)
 
     result = {}
@@ -50,23 +68,30 @@ def load_data(file_path, scale_params):
         concentration_fluor = data_by_split[type]['concentration_fluor']
         reflectance = data_by_split[type]['reflectance']
 
-        # f, mu_a_norm, mu_s_norm = normalization(fluorescence, optical_props)
-        # data_dict = {
-        #     'fluorescence': f,
-        #     'reflectance': reflectance,
-        #     'depth': depth, 
-        #     'mu_a': mu_a_norm,
-        #     'mu_s': mu_s_norm,
-        #     'concentration_fluor': concentration_fluor}
-        scaled_data_dict = scale_data({
-            'fluorescence': fluorescence,
-            'reflectance': reflectance,
-            'depth': depth, 
-            'mu_a': optical_props[..., 0],
-            'mu_s': optical_props[..., 1],
-            'concentration_fluor': concentration_fluor
-            }, scale_params)
-        
-        result[type] = scaled_data_dict
+        if not normalize:
+            scaled_data_dict = scale_data({
+                'fluorescence': fluorescence,
+                'reflectance': reflectance,
+                'depth': depth, 
+                'mu_a': optical_props[..., 0],
+                'mu_s': optical_props[..., 1],
+                'concentration_fluor': concentration_fluor
+                }, scale_params)
+            
+            result[type] = scaled_data_dict
+        else:
+            mins_maxs_fluorescence = get_channel_min_max(fluorescence)
+            mins_maxs_optical_props = get_channel_min_max(optical_props)
+            normed_op = minmax_normalize(optical_props, mins_maxs_optical_props)
+            normalized_data_dict = {
+                'fluorescence': minmax_normalize(fluorescence, mins_maxs_fluorescence),
+                'reflectance': reflectance,
+                'depth': depth, 
+                'mu_a': normed_op[..., 0],
+                'mu_s': normed_op[..., 1],
+                'concentration_fluor': concentration_fluor
+            }
+            result[type] = normalized_data_dict
+            print("Normalize over fluorescence and optical properties")
 
     return result

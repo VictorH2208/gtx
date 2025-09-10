@@ -17,13 +17,14 @@ estimator = TensorFlow(
         "sagemaker": True,
         "activation": "relu",
         "optimizer": "Adam",
-        "epochs": 100,
+        "epochs": 1,
         "nF": 6,
         "learningRate": 5e-4,
         "batch": 32,
         "xX": 101,
         "yY": 101,
         "decayRate": 0.4,
+        "normalize": True,
         "scaleFL": 10e4,
         "scaleOP0": 10,
         "scaleOP1": 1,
@@ -36,12 +37,12 @@ estimator = TensorFlow(
         "nFilters2D": 128,
         "kernelConv2D": "3 3",
         "strideConv2D": "1 1",
-        "data_path": "s3://20250509-victor/python_training_data_sim/20250822_mcx_sujit_100scale_splited.mat"
+        "data_path": "s3://20250509-victor/python_training_data_sim/20241118_data_splited.mat"
     },
     output_path='s3://20250509-victor/tf_model_output/'
 )
 job_name = f'model-output-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 inputs = {
-    'training': 's3://20250509-victor/python_training_data_sim/20250822_mcx_sujit_100scale_splited.mat',
+    'training': 's3://20250509-victor/python_training_data_sim/20241118_data_splited.mat',
 }
 estimator.fit(inputs=inputs, job_name=job_name)
