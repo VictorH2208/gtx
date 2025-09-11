@@ -60,13 +60,20 @@ def load_data(file_path, scale_params, normalize=False):
     data_by_split = load_split_data(file_path)
 
     result = {}
-
+    mins_maxs_fluorescence = None
+    mins_maxs_optical_props = None
     for type in ['train', 'val', 'test']:
         fluorescence = data_by_split[type]['fluorescence']
         optical_props = data_by_split[type]['optical_props']
         depth = data_by_split[type]['depth']
         concentration_fluor = data_by_split[type]['concentration_fluor']
         reflectance = data_by_split[type]['reflectance']
+
+        if type == 'train':
+            mins_maxs_fluorescence = get_channel_min_max(fluorescence)
+            mins_maxs_optical_props = get_channel_min_max(optical_props)
+            print("FFFFF:", mins_maxs_fluorescence)
+            print("OOOOO:", mins_maxs_optical_props)
 
         if not normalize:
             scaled_data_dict = scale_data({
@@ -80,8 +87,6 @@ def load_data(file_path, scale_params, normalize=False):
             
             result[type] = scaled_data_dict
         else:
-            mins_maxs_fluorescence = get_channel_min_max(fluorescence)
-            mins_maxs_optical_props = get_channel_min_max(optical_props)
             normed_op = minmax_normalize(optical_props, mins_maxs_optical_props)
             normalized_data_dict = {
                 'fluorescence': minmax_normalize(fluorescence, mins_maxs_fluorescence),
