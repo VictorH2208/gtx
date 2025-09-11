@@ -38,6 +38,7 @@ def get_arg_parser():
     parser = argparse.ArgumentParser(description="Hyperparameter configuration for fluorescence imaging model.")
 
     parser.add_argument('--sagemaker', type=bool, default=False, help='SageMaker mode')
+    parser.add_argument('--train_subset', type=int, default=8000, help='Train subset')
 
     # General hyperparameters
     parser.add_argument('--activation', type=str, default='relu', help='Activation function')
@@ -146,6 +147,16 @@ def train(params):
     train_concentration_fluor = train_data['concentration_fluor']
     # train_concentration_fluor = train_mask
     train_reflectance = train_data['reflectance']
+
+    N = train_fluorescence.shape[0]
+    if params['train_subset'] and 0 < params['train_subset'] < N:
+        rng = np.random.RandomState(1024)
+        idx = rng.choice(N, size=params['train_subset'], replace=False)
+        train_fluorescence       = train_fluorescence[idx]
+        train_op                  = train_op[idx]
+        train_depth               = train_depth[idx]
+        train_concentration_fluor = train_concentration_fluor[idx]
+        train_reflectance         = train_reflectance[idx]
 
     train_dataset = tf.data.Dataset.from_tensor_slices((
         (train_op, train_fluorescence),  # tuple of inputs
