@@ -69,10 +69,12 @@ def load_data(file_path, scale_params, normalize=False):
         concentration_fluor = data_by_split[type]['concentration_fluor']
         reflectance = data_by_split[type]['reflectance']
 
+        fr = fluorescence / (reflectance + 1e-20)
+
         if type == 'train':
-            mins_maxs_fluorescence = get_channel_min_max(fluorescence)
+            mins_maxs_fr = get_channel_min_max(fr)
             mins_maxs_optical_props = get_channel_min_max(optical_props)
-            print("FFFFF:", mins_maxs_fluorescence)
+            print("FFFFF:", mins_maxs_fr)
             print("OOOOO:", mins_maxs_optical_props)
 
         if not normalize:
@@ -88,8 +90,9 @@ def load_data(file_path, scale_params, normalize=False):
             result[type] = scaled_data_dict
         else:
             normed_op = minmax_normalize(optical_props, mins_maxs_optical_props)
+            normed_fr = minmax_normalize(fr, mins_maxs_fr)
             normalized_data_dict = {
-                'fluorescence': minmax_normalize(fluorescence, mins_maxs_fluorescence),
+                'fluorescence': normed_fr,
                 'reflectance': reflectance,
                 'depth': depth, 
                 'mu_a': normed_op[..., 0],
