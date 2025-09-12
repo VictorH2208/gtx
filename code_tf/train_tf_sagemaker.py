@@ -15,7 +15,7 @@ estimator = TensorFlow(
     dependencies=['requirements.txt'],
     hyperparameters= {
         "sagemaker": True,
-        "train_subset": 8000,
+        "train_subset": 1000,
         "activation": "relu",
         "optimizer": "Adam",
         "epochs": 100,
