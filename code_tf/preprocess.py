@@ -1,4 +1,5 @@
 import scipy.io as sio
+import mat73
 import numpy as np
 
 def scale_data(data_dict, params):
@@ -40,10 +41,55 @@ def minmax_normalize(data, mins_maxs):
         out[..., ch][mask] = (out[..., ch][mask] - mn) / (mx - mn)
     return out
 
-def load_split_data(file_path):
-    data = sio.loadmat(file_path)
+def split_indices(n_samples, val_size=0.1, test_size=0.1, random_state=1024):
+    all_idx = np.arange(n_samples)
+    np.random.seed(random_state)
+    np.random.shuffle(all_idx)
+
+    n_val = int(n_samples * val_size)
+    n_test = int(n_samples * test_size)
+    n_train = n_samples - n_val - n_test
+
+    train_idx = all_idx[:n_train]
+    val_idx = all_idx[n_train:n_train + n_val]
+    test_idx = all_idx[n_train + n_val:]
     
-    data = {k: v for k, v in data.items() if not k.startswith('__')}
+    return train_idx, val_idx, test_idx
+
+def load_split_data(file_path, seed):
+    data = mat73.loadmat(file_path)
+    fluorescence = data['F']    
+    reflectance = data['RE']  
+    depth = data['DF']          
+    optical_props = data['OP']  
+    concentration_fluor = data['QF']  
+
+    n_samples = data['F'].shape[0]
+    train_idx, val_idx, test_idx = split_indices(n_samples, random_state=seed)
+
+    split_data = {
+        'train_fluorescence': fluorescence[train_idx],
+        'val_fluorescence': fluorescence[val_idx],
+        'test_fluorescence': fluorescence[test_idx],
+
+        'train_optical_props': optical_props[train_idx],
+        'val_optical_props': optical_props[val_idx],
+        'test_optical_props': optical_props[test_idx],
+
+        'train_reflectance': reflectance[train_idx],
+        'val_reflectance': reflectance[val_idx],
+        'test_reflectance': reflectance[test_idx],
+
+        'train_depth': depth[train_idx],
+        'val_depth': depth[val_idx],
+        'test_depth': depth[test_idx],
+
+        'train_concentration_fluor': concentration_fluor[train_idx],
+        'val_concentration_fluor': concentration_fluor[val_idx],
+        'test_concentration_fluor': concentration_fluor[test_idx],
+    }
+    
+    data = {k: v for k, v in split_data.items() if not k.startswith('__')}
 
     splits = ['train', 'val', 'test']
     data_by_split = {split: {} for split in splits}
@@ -56,8 +102,8 @@ def load_split_data(file_path):
 
     return data_by_split
 
-def load_data(file_path, scale_params, normalize=False):
-    data_by_split = load_split_data(file_path)
+def load_data(file_path, scale_params, seed, normalize=False):
+    data_by_split = load_split_data(file_path, seed)
 
     result = {}
     mins_maxs_fluorescence = None

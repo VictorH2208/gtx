@@ -39,6 +39,7 @@ def get_arg_parser():
 
     parser.add_argument('--sagemaker', type=bool, default=False, help='SageMaker mode')
     parser.add_argument('--train_subset', type=int, default=8000, help='Train subset')
+    parser.add_argument('--seed', type=int, default=1024, help='Seed')
 
     # General hyperparameters
     parser.add_argument('--activation', type=str, default='relu', help='Activation function')
@@ -132,9 +133,9 @@ def train(params):
 
     if params['sagemaker']:
         filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_splited.mat')
-        data = load_data(filepath, scale_params, params['normalize'])
+        data = load_data(filepath, scale_params, params['seed'], params['normalize'])
     else:
-        data = load_data(params['data_path'], scale_params, params['normalize'])
+        data = load_data(params['data_path'], scale_params, params['seed'], params['normalize'])
 
     train_data = data['train']
     train_fluorescence = train_data['fluorescence']
