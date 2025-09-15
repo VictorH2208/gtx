@@ -74,7 +74,7 @@ def get_arg_parser():
 
     # Data path
     parser.add_argument('--data_path', type=str, default='../data/ts_2d_10000.mat')
-    parser.add_argument('--model_dir', type=str, default=f'../code_tf/aws_ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
+    parser.add_argument('--model_dir', type=str, default='../code_tf/aws_ckpt/')
     return parser
 
 class BatchLogger(callbacks.Callback):
@@ -226,7 +226,7 @@ def train(params):
     if params['sagemaker']:
         model_dir = f'/opt/ml/model'
     else:
-        model_dir = params['model_dir']
+        model_dir = os.path.join(params['model_dir'], f"subset{params['train_subset']}-epochs{params['epochs']}-batch{params['batch']}-data{params['data_path'].split('.')[0]}")
         os.makedirs(model_dir, exist_ok=True)
 
     checkpoint = CustomModelCheckpoint(
