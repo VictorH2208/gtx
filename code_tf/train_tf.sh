@@ -4,6 +4,10 @@
 set -e
 
 # === Configuration Variables ===
+SAGEMAKER=False
+SEED=1024
+TRAIN_SUBSET=8000
+
 ACTIVATION="relu"
 OPTIMIZER="Adam"
 EPOCHS=100
@@ -22,12 +26,15 @@ SCALE_DF=1
 SCALE_QF=1
 SCALE_RE=1
 
+DATA_PATH="ts_2d_10000.mat"
 
-DATA_PATH="../data/20241118_data_splited.mat"
 # === Run training ===
 echo "Launching training with the following parameters:"
 
 python train_tf.py \
+    --sagemaker $SAGEMAKER \
+    --seed $SEED \
+    --train_subset $TRAIN_SUBSET \
     --activation $ACTIVATION \
     --optimizer $OPTIMIZER \
     --epochs $EPOCHS \

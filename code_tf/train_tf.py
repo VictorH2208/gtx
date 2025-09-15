@@ -73,8 +73,8 @@ def get_arg_parser():
     parser.add_argument('--strideConv2D', type=int, nargs=2, default=[1,1])
 
     # Data path
-    parser.add_argument('--data_path', type=str, default='../data/20241118_data_splited.mat')
-    parser.add_argument('--model_dir', type=str, default=f'../code_tf/ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
+    parser.add_argument('--data_path', type=str, default='../data/ts_2d_10000.mat')
+    parser.add_argument('--model_dir', type=str, default=f'../code_tf/aws_ckpt/{datetime.now().strftime("%Y%m%d_%H%M%S")}/')
     return parser
 
 class BatchLogger(callbacks.Callback):
@@ -132,10 +132,11 @@ def train(params):
     }
 
     if params['sagemaker']:
-        filepath = os.path.join('/opt/ml/input/data/training', '20241118_data_splited.mat')
+        filepath = os.path.join('/opt/ml/input/data/training', params['data_path'])
         data = load_data(filepath, scale_params, params['seed'], params['normalize'])
     else:
-        data = load_data(params['data_path'], scale_params, params['seed'], params['normalize'])
+        filepath = os.path.join('../data', params['data_path'])
+        data = load_data(filepath, scale_params, params['seed'], params['normalize'])
 
     train_data = data['train']
     train_fluorescence = train_data['fluorescence']
