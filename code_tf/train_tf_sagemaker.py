@@ -1,9 +1,9 @@
 from sagemaker.tensorflow import TensorFlow
 
-role = 'arn:aws:iam::425873948573:role/service-role/AmazonSageMaker-ExecutionRole-20220524T140113'  # Replace this
+role = 'arn:aws:iam::425873948573:role/service-role/AmazonSageMaker-ExecutionRole-20220524T140113'
 
 seed = 1024
-train_subset = 1000
+train_subset = 8000
 activation = "relu"
 optimizer = "Adam"
 epochs = 100
@@ -26,11 +26,11 @@ strideConv3D = "1 1 1"
 nFilters2D = 128
 kernelConv2D = "3 3"
 strideConv2D = "1 1"
-data_path = "ts_2d_10000.mat"
+data_path = "mcx_10000_newOP.mat" # <--- Change this if you want to use a different dataset
 
 estimator = TensorFlow(
     entry_point='train_tf.py',     # Entry script
-    source_dir='.',                   # This is the key: run from `tensorflow/`
+    source_dir='.',                   # This is the key: run from `code_tf/`
     role=role,
     instance_count=1,
     instance_type='ml.g5.2xlarge',
@@ -65,11 +65,11 @@ estimator = TensorFlow(
         "strideConv2D": strideConv2D,
         "data_path": data_path
     },
-    output_path='s3://20250509-victor/tf_training_output/'
+    output_path='s3://20250509-victor/tf_training_output/' # <--- Change this to your own bucket and output path
 )
 job_name = f'vvv-tfTrain-subset{train_subset}-seed{seed}-data{data_path.split(".")[0]}'
 job_name = job_name.replace("_", "-")
 inputs = {
-    'training': 's3://20250509-victor/python_training_data_sim/ts_2d_10000.mat',
+    'training': 's3://20250509-victor/python_training_data_sim/mcx_10000_newOP.mat', # <--- Change this to your own bucket and dataset
 }
 estimator.fit(inputs=inputs, job_name=job_name)

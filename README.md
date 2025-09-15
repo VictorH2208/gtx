@@ -1,8 +1,10 @@
-# GTX code
+# GTx Training Pipeline
 
-## Dataset
+Create virtual environment and install all required packages. Prefer Python version 3.10
 
-* Download dataset by running the load_data notebook (from AWS S3) and move to the `/data` folder
+## Dataset for Local Training
+
+* Download dataset (running the load_data notebook or from AWS S3) and move to the `/data` folder
 
 ## TensorFlow version
 
@@ -19,8 +21,13 @@ bash train_py.sh
 ```
 
 ## Sagemaker
+* Only if you want this to run as **Training Jobs** on AWS.
 
-`cd code_{tf/py}` and run the `sagemaker_launcher_{tf/py}.py` file.
+* Install *AWS Cli* using cmd line and type `aws configure` to input your access keys. 
+
+* Change the necessary variables (labeled with comment) in ` sagemaker_launcher_{tf/py}.py` file for customization.
+
+* `cd code_{tf/py}` and run `python sagemaker_launcher_{tf/py}.py` to start training.
 
 # MATLAB without onedrive
 
