@@ -57,7 +57,20 @@ def split_indices(n_samples, val_size=0.1, test_size=0.1, random_state=1024):
     return train_idx, val_idx, test_idx
 
 def load_split_data(file_path, seed):
-    data = mat73.loadmat(file_path)
+
+
+    try:
+        data = mat73.loadmat(file_path)
+    except Exception as e1:
+        try:
+            data = sio.loadmat(file_path)
+        except Exception as e2:
+            raise RuntimeError(
+                f"Failed to load {file_path} with both mat73 and scipy.io.\n"
+                f"mat73 error: {e1}\n"
+                f"scipy.io error: {e2}"
+            )
+
     fluorescence = data['F']    
     reflectance = data['RE']  
     depth = data['DF']          

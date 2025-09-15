@@ -3,7 +3,7 @@ from sagemaker.tensorflow import TensorFlow
 role = 'arn:aws:iam::425873948573:role/service-role/AmazonSageMaker-ExecutionRole-20220524T140113'  # Replace this
 
 seed = 1024
-train_subset = 8000
+train_subset = 1000
 activation = "relu"
 optimizer = "Adam"
 epochs = 100
@@ -67,7 +67,7 @@ estimator = TensorFlow(
     },
     output_path='s3://20250509-victor/tf_training_output/'
 )
-job_name = f'vvv-tfTrain-subset{train_subset}-epochs{epochs}-batch{batch}-data{data_path.split(".")[0]}'
+job_name = f'vvv-tfTrain-subset{train_subset}-seed{seed}-data{data_path.split(".")[0]}'
 job_name = job_name.replace("_", "-")
 inputs = {
     'training': 's3://20250509-victor/python_training_data_sim/ts_2d_10000.mat',
