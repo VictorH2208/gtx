@@ -122,7 +122,7 @@ def load_data(file_path, scale_params, seed, normalize=False):
     mins_maxs_fluorescence = None
     mins_maxs_optical_props = None
     for type in ['train', 'val', 'test']:
-        fluorescence = data_by_split[type]['fluorescence']
+        fluorescence = data_by_split[type]['fluorescence'][:,:,:,:4]
         optical_props = data_by_split[type]['optical_props']
         depth = data_by_split[type]['depth']
         concentration_fluor = data_by_split[type]['concentration_fluor']

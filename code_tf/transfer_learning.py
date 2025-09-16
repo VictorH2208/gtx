@@ -200,6 +200,10 @@ def transfer_learning(params):
     ))
     test_dataset = test_dataset.batch(batch)
 
+    print("Train dataset shape:", train_dataset.element_spec)
+    print("Val dataset shape:", val_dataset.element_spec)
+    print("Test dataset shape:", test_dataset.element_spec)
+
     lr_scheduler = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=decay_rate, patience=patience, verbose=1, min_lr=1e-6)
     early_stopping = callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5, patience=patience, verbose=1, mode='auto')
     batch_logger = BatchLogger(log_interval=20, num_samples= int(train_fluorescence.shape[0]), batch_size=batch)

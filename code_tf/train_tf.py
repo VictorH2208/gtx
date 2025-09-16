@@ -214,6 +214,10 @@ def train(params):
     # ))
     test_dataset = test_dataset.batch(params['batch'])
 
+    print("Train dataset shape:", train_dataset.element_spec)
+    print("Val dataset shape:", val_dataset.element_spec)
+    print("Test dataset shape:", test_dataset.element_spec)
+
     # Initialize model
     model = ModelInit(params)
     model.build_model()
