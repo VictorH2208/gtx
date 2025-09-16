@@ -1,4 +1,5 @@
 from sagemaker.tensorflow import TensorFlow
+from datetime import datetime
 
 role = 'arn:aws:iam::425873948573:role/service-role/AmazonSageMaker-ExecutionRole-20220524T140113'
 
@@ -26,7 +27,7 @@ strideConv3D = "1 1 1"
 nFilters2D = 128
 kernelConv2D = "3 3"
 strideConv2D = "1 1"
-data_path = "mcx_10000_newOP.mat" # <--- Change this if you want to use a different dataset
+data_path = "mix_2dts_mcx_10000.mat" # <--- Change this if you want to use a different dataset
 bucket_name = "20250509-victor" # <--- Change this to your own bucket
 
 estimator = TensorFlow(
@@ -68,9 +69,9 @@ estimator = TensorFlow(
     },
     output_path=f's3://{bucket_name}/tf_training_output/' # <--- Change this to your own bucket and output path
 )
-job_name = f'vvv-tfTrain-subset{train_subset}-seed{seed}-data{data_path.split(".")[0]}'
+job_name = f'vvv-tfTrain-{train_subset}-{seed}-{data_path.split(".")[0]}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 job_name = job_name.replace("_", "-")
 inputs = {
-    'training': f's3://{bucket_name}/python_training_data_sim/{data_path}.mat',
+    'training': f's3://{bucket_name}/python_training_data_sim/{data_path}',
 }
 estimator.fit(inputs=inputs, job_name=job_name)

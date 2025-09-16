@@ -9,9 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 import argparse
 import numpy as np
-from tqdm import tqdm
 import tensorflow as tf
-from datetime import datetime
 import keras
 from keras import callbacks, optimizers, metrics
 from keras.saving import register_keras_serializable
@@ -80,7 +78,7 @@ class CustomModelCheckpoint(callbacks.Callback):
 def get_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name', type=str, required=True)
-    parser.add_argument('--local_model_dir', type=str, required=True)
+    parser.add_argument('--model_dir', type=str, required=True)
     parser.add_argument('--data_path', type=str, required=True)
     parser.add_argument('--is_aws', type=bool, default=False)
     parser.add_argument('--names_to_train', type=str, required=True)
@@ -171,7 +169,6 @@ def transfer_learning(params):
         {'outDF': train_depth, 'outQF': train_concentration_fluor}  # dict of outputs
     ))
     train_dataset = train_dataset.shuffle(buffer_size=1000, seed=1024, reshuffle_each_iteration=False).batch(batch)
-    print("Fuc", train_fluorescence.shape)
 
     val_data = data['val']
     val_fluorescence = val_data['fluorescence']
@@ -210,7 +207,7 @@ def transfer_learning(params):
     if is_aws:
         model_dir = f'/opt/ml/model'
     else:
-        model_dir = params['local_model_dir']
+        model_dir = params['model_dir']
         os.makedirs(model_dir, exist_ok=True)
 
     checkpoint = CustomModelCheckpoint(
