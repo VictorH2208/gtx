@@ -4,7 +4,7 @@
 set -e
 
 # === Configuration Variables ===
-MODEL_PATH="../code_tf/aws_ckpt/model.keras"
+MODEL_NAME="../code_tf/aws_ckpt/model.keras"
 DATA_PATH="../data/20241118_data_splited.mat"
 MODEL_DIR="../code_tf/aws_ckpt"
 NAMES_TO_TRAIN=["conv2d_25","conv2d_26","conv2d_27","outQF_logits","conv2d_28","conv2d_29","outDF_logits"]
@@ -15,6 +15,8 @@ LEARNING_RATE=1e-5
 DECAY_RATE=0.4
 PATIENCE=10
 IS_AWS=True
+SEED=1024
+NORMALIZE=False
 
 SCALE_FL=1e5
 SCALE_OP0=10
@@ -27,11 +29,12 @@ SCALE_RE=1
 echo "Launching transfer learning with the following parameters:"
 
 python transfer_learning.py \
-    --model_path $MODEL_PATH \
+    --model_name $MODEL_NAME \
     --data_path $DATA_PATH \
-    --model_dir $MODEL_DIR \
+    --local_model_dir $MODEL_DIR \
     --is_aws $IS_AWS \
     --names_to_train $NAMES_TO_TRAIN \
+    --seed $SEED \
     --batch $BATCH \
     --epochs $EPOCHS \
     --learningRate $LEARNING_RATE \

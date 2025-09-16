@@ -79,11 +79,13 @@ class CustomModelCheckpoint(callbacks.Callback):
 
 def get_arg_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, required=True)
-    parser.add_argument('--model_dir', type=str, required=True)
+    parser.add_argument('--model_name', type=str, required=True)
+    parser.add_argument('--local_model_dir', type=str, required=True)
     parser.add_argument('--data_path', type=str, required=True)
     parser.add_argument('--is_aws', type=bool, default=False)
     parser.add_argument('--names_to_train', type=str, required=True)
+    parser.add_argument('--seed', type=int, required=True)
+    parser.add_argument('--normalize', type=bool, default=False)
     parser.add_argument('--train_subset', type=int, required=8000)
     parser.add_argument('--batch', type=int, required=True)
     parser.add_argument('--epochs', type=int, required=True)
@@ -106,11 +108,13 @@ def load_model(model_path):
 
 def transfer_learning(params):
 
-    model_path = params['model_path']
+    model_path = params['model_name']
     data_path = params['data_path']
     names_to_train = params['names_to_train']
     train_subset = params['train_subset']
     is_aws = params['is_aws']
+    seed = params['seed']
+    normalize = params['normalize']
     batch = params['batch']
     epochs = params['epochs']
     learning_rate = params['learningRate']
@@ -128,11 +132,11 @@ def transfer_learning(params):
     if is_aws:
         filepath = os.path.join('/opt/ml/input/data/training', data_path)
         model_ckpt = os.path.join('/opt/ml/input/data/ckpt', model_path)
-        data = load_data(filepath, scale_params)
+        data = load_data(filepath, scale_params, seed, normalize=normalize)
     else:
         data_path = os.path.join('../data', data_path)
         model_ckpt = model_path
-        data = load_data(data_path, scale_params)
+        data = load_data(data_path, scale_params, seed, normalize=normalize)
     
     model = load_model(model_ckpt)
 
@@ -206,7 +210,7 @@ def transfer_learning(params):
     if is_aws:
         model_dir = f'/opt/ml/model'
     else:
-        model_dir = params['model_dir']
+        model_dir = params['local_model_dir']
         os.makedirs(model_dir, exist_ok=True)
 
     checkpoint = CustomModelCheckpoint(
