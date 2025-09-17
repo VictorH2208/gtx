@@ -5,7 +5,10 @@ import numpy as np
 def scale_data(data_dict, params):
     scaled_data_dict = {}
     for key, items in data_dict.items():
-        scaled_data_dict[key] = items * params[key]
+        try:
+            scaled_data_dict[key] = items * params[key]
+        except:
+            scaled_data_dict[key] = items
     return scaled_data_dict
 
 def get_channel_min_max(data):
