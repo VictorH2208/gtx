@@ -27,7 +27,7 @@ strideConv3D = "1 1 1"
 nFilters2D = 128
 kernelConv2D = "3 3"
 strideConv2D = "1 1"
-data_path = "mix_2dts_mcx_10000.mat" # <--- Change this if you want to use a different dataset
+data_path = "ts_3d_10000_original_noTBR.mat" # <--- Change this if you want to use a different dataset
 bucket_name = "20250509-victor" # <--- Change this to your own bucket
 
 estimator = TensorFlow(
@@ -69,7 +69,7 @@ estimator = TensorFlow(
     },
     output_path=f's3://{bucket_name}/tf_training_output/' # <--- Change this to your own bucket and output path
 )
-job_name = f'vvv-tfTrain-{train_subset}-{seed}-{data_path.split(".")[0]}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+job_name = f'vvv-tfTrain-{train_subset}-{seed}-{"_".join(data_path.split(".")[0].split("_")[:2])}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 job_name = job_name.replace("_", "-")
 inputs = {
     'training': f's3://{bucket_name}/python_training_data_sim/{data_path}',
