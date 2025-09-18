@@ -4,11 +4,12 @@ import keras
 from keras.models import Model, load_model
 from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation, Permute
 from keras import metrics
+import keras.backend as K
 from keras.saving import register_keras_serializable
 
 @register_keras_serializable(package="metrics_losses", name="tumor_mae")
 def tumor_mae(y_true, y_pred):
-    mask = tf.not_equal(y_true, 10.0)
+    mask = tf.not_equal(y_true, 0.0)
     err  = tf.abs(y_true - y_pred)
     masked_err = tf.boolean_mask(err, mask)
     return tf.cond(
@@ -17,10 +18,21 @@ def tumor_mae(y_true, y_pred):
         lambda: tf.constant(0.0)
     )
 
-@register_keras_serializable(package="metrics_losses", name="combined_df_loss")
-def combined_df_loss(y_true, y_pred):
-    # use the functional form for MAE to avoid class confusion
-    return tf.keras.losses.MAE(y_true, y_pred) + 5.0 * tumor_mae(y_true, y_pred)
+
+@register_keras_serializable(package="metrics_losses", name="weighted_bce")
+def weighted_bce(y_true, y_pred, pos_weight=5.0):
+    print("weighted_bce")
+    print(y_true.shape, y_pred.shape)
+    per_pixel_bce = tf.keras.losses.binary_crossentropy(
+        y_true, y_pred, from_logits=False
+    )     
+
+    weights = tf.where(tf.equal(y_true, 1.0),
+                       tf.cast(pos_weight, per_pixel_bce.dtype),
+                       tf.cast(1.0, per_pixel_bce.dtype))         # -> (B, H, W)
+
+    return tf.reduce_mean(per_pixel_bce * weights)    
+
 
 class ModelInit():  
 
@@ -61,8 +73,13 @@ class ModelInit():
 
         ## Fluorescence Input Branch ##
         input_shape = inFL_beg.shape
-        inFL = Conv3D(filters=self.params['nFilters3D']//2, kernel_size=self.params['kernelConv3D'], strides=self.params['strideConv3D'], 
-                padding='same', activation=self.params['activation'], input_shape=input_shape[1:], data_format="channels_last")(inFL_beg)
+        inFL = Conv3D(filters=self.params['nFilters3D']//2,
+              kernel_size=self.params['kernelConv3D'],
+              strides=self.params['strideConv3D'],
+              padding='same',
+              activation=self.params['activation'],
+              data_format="channels_last")(inFL_beg)
+
 
         inFL = Conv3D(filters=int(self.params['nFilters3D']/2), kernel_size=self.params['kernelConv3D'], strides=self.params['strideConv3D'], 
                 padding='same', activation=self.params['activation'], data_format="channels_last")(inFL)
@@ -152,16 +169,14 @@ class ModelInit():
         Conv_6 = Conv2D(filters=128, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
                 activation=self.params['activation'], data_format="channels_last")(concat_3)
         
-        # Quantitative Fluorescence head (QF)
-        qf = Conv2D(64, self.params['kernelConv2D'], self.params['strideConv2D'],
-                padding='same', activation=self.params['activation'],
-                data_format="channels_last")(Conv_6)
-        qf = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
-                padding='same', activation=self.params['activation'],
-                data_format="channels_last")(qf)
-        qf = Conv2D(1, (1, 1), (1, 1), padding='same', activation=None,
-                data_format="channels_last", name='outQF_logits')(qf)
-        outQF = keras.layers.Reshape((self.params['yY'], self.params['xX']), name='outQF')(qf)
+        # --------------- Shape Head (binary mask) -----------------
+        shape = Conv2D(64, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'])(Conv_6)
+        shape = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'])(shape)
+        shape = Conv2D(1, (1, 1), (1, 1), padding='same',
+               activation='None',  # binary output
+               name='shape_logits')(shape)
 
         # Depth head (DF)
         df = Conv2D(64, self.params['kernelConv2D'], self.params['strideConv2D'],
@@ -170,21 +185,28 @@ class ModelInit():
         df = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
                 padding='same', activation=self.params['activation'],
                 data_format="channels_last")(df)
-        df = Conv2D(1, (1, 1), (1, 1), padding='same', activation=None,
-                data_format="channels_last", name='outDF_logits')(df)
-        outDF = keras.layers.Reshape((self.params['yY'], self.params['xX']), name='outDF')(df)
+        df = Conv2D(1, (1, 1), (1, 1), padding='same',
+                activation=None,
+                data_format="channels_last", name='df_logits')(df)  # <-- different name
 
-        ## Defining and compiling the model ##
+        outDF = keras.layers.Reshape((self.params['yY'], self.params['xX']),
+                                name='outDF')(df)
 
-        self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outQF, outDF])
+
+        self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outShape, outDF])
 
         self.model.compile(
-            loss={'outQF': 'mae', 'outDF': combined_df_loss},
-            optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
-            metrics={
-                'outQF': metrics.MeanAbsoluteError(name='mae_conc'),
-                'outDF': [metrics.MeanAbsoluteError(name='mae_depth'), tumor_mae]
-            }
+                loss={
+                        'outShape': weighted_bce,
+                        'outDF': tumor_mae
+                },
+                optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
+                metrics={
+                        'outShape': [metrics.BinaryAccuracy(name='acc_shape'),
+                                metrics.Precision(name='prec_shape'),
+                                metrics.Recall(name='rec_shape')],
+                        'outDF': [tumor_mae]
+                }
         )
         
         # self.model.summary()
@@ -192,13 +214,7 @@ class ModelInit():
         return None
     
     def load_model(self, model_path):
-        self.model = load_model(
-            model_path,
-            custom_objects={
-                "combined_df_loss": combined_df_loss,
-                "tumor_mae": tumor_mae
-            }
-        )
+        self.model = load_model(model_path)
 
         return None
     

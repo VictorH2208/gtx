@@ -6,7 +6,7 @@ from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, M
 from keras import metrics
 from keras.saving import register_keras_serializable
 
-@register_keras_serializable(package="metrics_losses", name="tumor_mae")
+@register_keras_serializable()
 def tumor_mae(y_true, y_pred):
     mask = tf.not_equal(y_true, 10.0)
     err  = tf.abs(y_true - y_pred)
@@ -15,12 +15,7 @@ def tumor_mae(y_true, y_pred):
         tf.size(masked_err) > 0,
         lambda: tf.reduce_mean(masked_err),
         lambda: tf.constant(0.0)
-    )
-
-@register_keras_serializable(package="metrics_losses", name="combined_df_loss")
-def combined_df_loss(y_true, y_pred):
-    # use the functional form for MAE to avoid class confusion
-    return tf.keras.losses.MAE(y_true, y_pred) + 5.0 * tumor_mae(y_true, y_pred)
+    ) 
 
 class ModelInit():  
 
@@ -174,16 +169,18 @@ class ModelInit():
                 data_format="channels_last", name='outDF_logits')(df)
         outDF = keras.layers.Reshape((self.params['yY'], self.params['xX']), name='outDF')(df)
 
+
+
         ## Defining and compiling the model ##
 
         self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outQF, outDF])
 
         self.model.compile(
-            loss={'outQF': 'mae', 'outDF': combined_df_loss},
+            loss={'outQF': 'mae', 'outDF': 'mae', },
             optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
             metrics={
-                'outQF': metrics.MeanAbsoluteError(name='mae_conc'),
-                'outDF': [metrics.MeanAbsoluteError(name='mae_depth'), tumor_mae]
+                'outQF': metrics.MeanAbsoluteError(name='mae_qf'),
+                'outDF': [metrics.MeanAbsoluteError(name='mae_df'), tumor_mae]
             }
         )
         
@@ -192,13 +189,7 @@ class ModelInit():
         return None
     
     def load_model(self, model_path):
-        self.model = load_model(
-            model_path,
-            custom_objects={
-                "combined_df_loss": combined_df_loss,
-                "tumor_mae": tumor_mae
-            }
-        )
+        self.model = load_model(model_path)
 
         return None
     

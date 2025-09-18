@@ -118,7 +118,7 @@ def load_split_data(file_path, seed):
 
     return data_by_split
 
-def load_data(file_path, scale_params, seed, normalize=False):
+def load_data(file_path, scale_params, seed, normalize):
     data_by_split = load_split_data(file_path, seed)
 
     result = {}
@@ -140,6 +140,7 @@ def load_data(file_path, scale_params, seed, normalize=False):
             print("OOOOO:", mins_maxs_optical_props)
 
         if not normalize:
+            print("You are not normalizing the data")
             scaled_data_dict = scale_data({
                 'fluorescence': fluorescence,
                 'reflectance': reflectance,
@@ -151,6 +152,7 @@ def load_data(file_path, scale_params, seed, normalize=False):
             
             result[type] = scaled_data_dict
         else:
+            print("Normalize over fluorescence and optical properties")
             normed_op = minmax_normalize(optical_props, mins_maxs_optical_props)
             normed_fr = minmax_normalize(fr, mins_maxs_fr)
             normalized_data_dict = {
@@ -162,6 +164,6 @@ def load_data(file_path, scale_params, seed, normalize=False):
                 'concentration_fluor': concentration_fluor
             }
             result[type] = normalized_data_dict
-            print("Normalize over fluorescence and optical properties")
+            
 
     return result

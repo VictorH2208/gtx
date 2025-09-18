@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from model.model_hikaru import ModelInit
+from model.model_shape import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime
@@ -144,8 +144,8 @@ def train(params):
     train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)
     train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     train_depth = train_data['depth']
-    train_depth[train_depth == 0] = -10
-    # train_mask = (train_data['depth'] != 0).astype(int)
+    train_depth[train_depth == 0] = 0
+    train_shape = (train_depth > 0).astype(np.float32)[..., np.newaxis]
     train_concentration_fluor = train_data['concentration_fluor']
     # train_concentration_fluor = train_mask
     train_reflectance = train_data['reflectance']
@@ -157,12 +157,13 @@ def train(params):
         train_fluorescence       = train_fluorescence[idx]
         train_op                  = train_op[idx]
         train_depth               = train_depth[idx]
+        train_shape               = train_shape[idx]
         train_concentration_fluor = train_concentration_fluor[idx]
         train_reflectance         = train_reflectance[idx]
 
     train_dataset = tf.data.Dataset.from_tensor_slices((
         (train_op, train_fluorescence),  # tuple of inputs
-        {'outDF': train_depth, 'outQF': train_concentration_fluor}  # dict of outputs
+        {'outDF': train_depth, 'outShape': train_shape}  # dict of outputs
     ))
     # train_dataset = tf.data.Dataset.from_tensor_slices((
     #     (train_op, train_fluorescence),  # tuple of inputs
@@ -176,15 +177,15 @@ def train(params):
     val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)
     val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     val_depth = val_data['depth']
-    val_depth[val_depth == 0] = -10
-    # val_mask = (val_data['depth'] != 0).astype(int)
+    val_depth[val_depth == 0] = 0
+    val_shape = (val_depth > 0).astype(np.float32)[..., np.newaxis]
     val_concentration_fluor = val_data['concentration_fluor']
     # val_concentration_fluor = val_mask
     val_reflectance = val_data['reflectance']
 
     val_dataset = tf.data.Dataset.from_tensor_slices((
         (val_op, val_fluorescence),  # tuple of inputs
-        {'outDF': val_depth, 'outQF': val_concentration_fluor}  # dict of outputs
+        {'outDF': val_depth, 'outShape': val_shape}  # dict of outputs
     ))
     # val_dataset = tf.data.Dataset.from_tensor_slices((
     #     (val_op, val_fluorescence),  # tuple of inputs
@@ -198,15 +199,15 @@ def train(params):
     test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)
     test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     test_depth = test_data['depth']
-    test_depth[test_depth == 0] = -10
-    # test_mask = (test_data['depth'] != 0).astype(int)
+    test_depth[test_depth == 0] = 0
+    test_shape = (test_depth > 0).astype(np.float32)[..., np.newaxis]
     test_concentration_fluor = test_data['concentration_fluor']
     # test_concentration_fluor = test_mask
     test_reflectance = test_data['reflectance']
 
     test_dataset = tf.data.Dataset.from_tensor_slices((
         (test_op, test_fluorescence),  # tuple of inputs
-        {'outDF': test_depth, 'outQF': test_concentration_fluor}  # dict of outputs
+        {'outDF': test_depth, 'outShape': test_shape}  # dict of outputs
     ))
     # test_dataset = tf.data.Dataset.from_tensor_slices((
     #     (test_op, test_fluorescence),  # tuple of inputs
