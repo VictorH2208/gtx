@@ -52,7 +52,8 @@ def get_arg_parser():
     parser.add_argument('--yY', type=int, default=101, help='Image height')
     parser.add_argument('--decayRate', type=float, default=0.3, help='Learning rate decay factor')
     parser.add_argument('--patience', type=int, default=20, help='Early stopping patience')
-    parser.add_argument('--normalize', type=bool, default=False, help='Normalize data')
+    parser.add_argument('--normalize', type=int, default=0, help='Normalize data')
+    parser.add_argument('--depth_padding', type=int, default=0, help='Depth padding')
 
     # Scaling parameters
     parser.add_argument('--scaleFL', type=float, default=10e4, help='Scaling factor for fluorescence')
@@ -144,7 +145,7 @@ def train(params):
     train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)
     train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     train_depth = train_data['depth']
-    train_depth[train_depth == 0] = -10
+    train_depth[train_depth == 0] = params['depth_padding']
     # train_mask = (train_data['depth'] != 0).astype(int)
     train_concentration_fluor = train_data['concentration_fluor']
     # train_concentration_fluor = train_mask
@@ -176,7 +177,7 @@ def train(params):
     val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)
     val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     val_depth = val_data['depth']
-    val_depth[val_depth == 0] = -10
+    val_depth[val_depth == 0] = params['depth_padding']
     # val_mask = (val_data['depth'] != 0).astype(int)
     val_concentration_fluor = val_data['concentration_fluor']
     # val_concentration_fluor = val_mask
@@ -198,7 +199,7 @@ def train(params):
     test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)
     test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     test_depth = test_data['depth']
-    test_depth[test_depth == 0] = -10
+    test_depth[test_depth == 0] = params['depth_padding']
     # test_mask = (test_data['depth'] != 0).astype(int)
     test_concentration_fluor = test_data['concentration_fluor']
     # test_concentration_fluor = test_mask

@@ -14,7 +14,8 @@ batch = 32
 xX = 101
 yY = 101
 decayRate = 0.4
-normalize = False
+depth_padding = -10
+normalize = 0
 scaleFL = 10e4
 scaleOP0 = 10
 scaleOP1 = 1
@@ -53,6 +54,7 @@ estimator = TensorFlow(
         "yY": yY,
         "decayRate": decayRate,
         "normalize": normalize,
+        "depth_padding": depth_padding,
         "scaleFL": scaleFL,
         "scaleOP0": scaleOP0,
         "scaleOP1": scaleOP1,
@@ -71,7 +73,7 @@ estimator = TensorFlow(
 )
 # job_name = f'vvv-tfTrain-{train_subset}-{seed}-{"_".join(data_path.split(".")[0].split("_")[:2])}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 # job_name = job_name.replace("_", "-")
-job_name = "vvvv-test-model-hikaru-mod-1"
+job_name = "vvvv-test-model-hikaru-mod-night2"
 inputs = {
     'training': f's3://{bucket_name}/python_training_data_sim/{data_path}',
 }

@@ -119,6 +119,7 @@ def load_split_data(file_path, seed):
     return data_by_split
 
 def load_data(file_path, scale_params, seed, normalize):
+    print("Normalize:", normalize)
     data_by_split = load_split_data(file_path, seed)
 
     result = {}

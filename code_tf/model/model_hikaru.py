@@ -6,16 +6,28 @@ from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, M
 from keras import metrics
 from keras.saving import register_keras_serializable
 
-@register_keras_serializable()
-def tumor_mae(y_true, y_pred):
-    mask = tf.not_equal(y_true, 10.0)
-    err  = tf.abs(y_true - y_pred)
-    masked_err = tf.boolean_mask(err, mask)
-    return tf.cond(
-        tf.size(masked_err) > 0,
-        lambda: tf.reduce_mean(masked_err),
-        lambda: tf.constant(0.0)
-    ) 
+@register_keras_serializable(package="metrics_losses")
+class TumorMAE(tf.keras.metrics.Metric):
+    def __init__(self, depth_padding=10.0, name="tumor_mae", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.depth_padding = depth_padding
+        self.total = self.add_weight(name="total", initializer="zeros")
+        self.count = self.add_weight(name="count", initializer="zeros")
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        mask = tf.not_equal(y_true, self.depth_padding)
+        err  = tf.abs(y_true - y_pred)
+        masked_err = tf.boolean_mask(err, mask)
+        value = tf.cond(
+            tf.size(masked_err) > 0,
+            lambda: tf.reduce_mean(masked_err),
+            lambda: tf.constant(0.0)
+        )
+        self.total.assign_add(value)
+        self.count.assign_add(1.0)
+
+    def result(self):
+        return self.total / self.count
 
 class ModelInit():  
 
@@ -169,21 +181,20 @@ class ModelInit():
                 data_format="channels_last", name='outDF_logits')(df)
         outDF = keras.layers.Reshape((self.params['yY'], self.params['xX']), name='outDF')(df)
 
-
-
         ## Defining and compiling the model ##
 
         self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outQF, outDF])
 
         self.model.compile(
-            loss={'outQF': 'mae', 'outDF': 'mae', },
-            optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
-            metrics={
+        loss={'outQF': 'mae', 'outDF': 'mae'},
+        optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
+        metrics={
                 'outQF': metrics.MeanAbsoluteError(name='mae_qf'),
-                'outDF': [metrics.MeanAbsoluteError(name='mae_df'), tumor_mae]
-            }
+                'outDF': [metrics.MeanAbsoluteError(name='mae_df'),
+                        TumorMAE(depth_padding=self.params['depth_padding'])]
+        }
         )
-        
+
         # self.model.summary()
 
         return None
