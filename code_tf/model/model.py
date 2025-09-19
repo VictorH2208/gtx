@@ -8,7 +8,7 @@ from keras.saving import register_keras_serializable
 
 @register_keras_serializable(package="metrics_losses", name="tumor_mae")
 def tumor_mae(y_true, y_pred):
-    mask = tf.not_equal(y_true, 10.0)
+    mask = tf.not_equal(y_true, 0.0)
     err  = tf.abs(y_true - y_pred)
     masked_err = tf.boolean_mask(err, mask)
     return tf.cond(

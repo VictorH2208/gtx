@@ -7,14 +7,14 @@ seed = 1024
 train_subset = 1000
 activation = "relu"
 optimizer = "Adam"
-epochs = 2
+epochs = 100
 nF = 6
 learningRate = 5e-4
 batch = 32
 xX = 101
 yY = 101
 decayRate = 0.4
-depth_padding = -10
+depth_padding = 20
 normalize = 0
 scaleFL = 10e4
 scaleOP0 = 10
@@ -73,7 +73,7 @@ estimator = TensorFlow(
 )
 # job_name = f'vvv-tfTrain-{train_subset}-{seed}-{"_".join(data_path.split(".")[0].split("_")[:2])}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 # job_name = job_name.replace("_", "-")
-job_name = "vvvv-test-model-hikaru-mod-night2"
+job_name = "vvvv-test-model-hikaru-mod-morning1"
 inputs = {
     'training': f's3://{bucket_name}/python_training_data_sim/{data_path}',
 }
