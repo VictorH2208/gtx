@@ -54,7 +54,7 @@ def get_arg_parser():
     parser.add_argument('--patience', type=int, default=20, help='Early stopping patience')
     parser.add_argument('--normalize', type=int, default=0, help='Normalize data')
     parser.add_argument('--depth_padding', type=int, default=0, help='Depth padding')
-
+    parser.add_argument('--fx_idx', type=int, nargs=6, default=[0, 1, 2, 3, 4, 5])
     # Scaling parameters
     parser.add_argument('--scaleFL', type=float, default=10e4, help='Scaling factor for fluorescence')
     parser.add_argument('--scaleOP0', type=float, default=10, help='Scaling for absorption coefficient (μa)')
@@ -141,6 +141,7 @@ def train(params):
 
     train_data = data['train']
     train_fluorescence = train_data['fluorescence']
+    train_fluorescence = train_fluorescence[...,params['fx_idx']]
     # train_fluorescence = np.transpose(train_fluorescence, (0, 3, 1, 2))
     train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)
     train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
@@ -173,6 +174,7 @@ def train(params):
 
     val_data = data['val']
     val_fluorescence = val_data['fluorescence']
+    val_fluorescence = val_fluorescence[...,params['fx_idx']]
     # val_fluorescence = np.transpose(val_fluorescence, (0, 3, 1, 2))
     val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)
     val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
@@ -195,6 +197,7 @@ def train(params):
 
     test_data = data['test']
     test_fluorescence = test_data['fluorescence']
+    test_fluorescence = test_fluorescence[...,params['fx_idx']]
     # test_fluorescence = np.transpose(test_fluorescence, (0, 3, 1, 2))
     test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)
     test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
