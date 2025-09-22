@@ -14,7 +14,7 @@ batch = 32
 xX = 101
 yY = 101
 decayRate = 0.4
-depth_padding = 20
+depth_padding = 10
 normalize = 1
 fx_idx = "0 1 2 3 4 5"
 
@@ -45,6 +45,7 @@ estimator = TensorFlow(
     script_mode=True,
     dependencies=['requirements.txt'],
     hyperparameters= {
+        "seed": seed,
         "sagemaker": True,
         "train_subset": train_subset,
         "activation": "relu",
