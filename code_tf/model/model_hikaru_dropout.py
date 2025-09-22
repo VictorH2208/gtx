@@ -1,20 +1,33 @@
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation, Permute
-from tensorflow.keras import metrics
 import tensorflow as tf
-from tensorflow.keras.saving import register_keras_serializable
-from tensorflow.keras.models import model_from_json
 
-@register_keras_serializable()
-def tumor_mae(y_true, y_pred):
-    mask = tf.not_equal(y_true, 0.0)
-    err  = tf.abs(y_true - y_pred)
-    masked_err = tf.boolean_mask(err, mask)
-    return tf.cond(
-        tf.size(masked_err) > 0,
-        lambda: tf.reduce_mean(masked_err),
-        lambda: tf.constant(0.0)
-    ) 
+import keras
+from keras.models import Model, load_model
+from keras.layers import Input, concatenate, Conv2D, Conv3D, Reshape, Dropout, MaxPool2D,UpSampling2D, ZeroPadding2D, Activation, Permute
+from keras import metrics
+from keras.saving import register_keras_serializable
+
+@register_keras_serializable(package="metrics_losses")
+class TumorMAE(tf.keras.metrics.Metric):
+    def __init__(self, depth_padding=10.0, name="tumor_mae", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.depth_padding = depth_padding
+        self.total = self.add_weight(name="total", initializer="zeros")
+        self.count = self.add_weight(name="count", initializer="zeros")
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        mask = tf.not_equal(y_true, self.depth_padding)
+        err  = tf.abs(y_true - y_pred)
+        masked_err = tf.boolean_mask(err, mask)
+        value = tf.cond(
+            tf.size(masked_err) > 0,
+            lambda: tf.reduce_mean(masked_err),
+            lambda: tf.constant(0.0)
+        )
+        self.total.assign_add(value)
+        self.count.assign_add(1.0)
+
+    def result(self):
+        return self.total / self.count
 
 class ModelInit():  
 
@@ -36,7 +49,7 @@ class ModelInit():
 
         """The deep learning architecture gets defined here"""
         # Input Optical Properties
-        # inOP_beg = Input(shape=(self.params['xX'],self.params['yY'],2))
+        inOP_beg = Input(shape=(self.params['xX'],self.params['yY'],2))
         ## Input Multi-Dimensional Fluorescence
         inFL_beg = Input(shape=(self.params['xX'], self.params['yY'], self.params['nF'], 1))
 
@@ -44,37 +57,38 @@ class ModelInit():
         #3D CNN for all layers
 
         ## Optical Properties Branch ##
-        # inOP = Conv2D(filters=self.params['nFilters2D']//2, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
-        #         padding='same', activation=self.params['activation'], data_format="channels_last")(inOP_beg)
-        # # inOP = Dropout(0.75)(inOP)
-
-        # inOP = Conv2D(filters=int(self.params['nFilters2D']/2), kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
-        #         padding='same', activation=self.params['activation'], data_format="channels_last")(inOP)
-        # # inOP = Dropout(0.75)(inOP)
+        inOP = Conv2D(filters=self.params['nFilters2D']//2, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
+                padding='same', activation=self.params['activation'], data_format="channels_last")(inOP_beg)
+        inOP = Dropout(0.5)(inOP)
         
-        # inOP = Conv2D(filters=int(self.params['nFilters2D']/2), kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
-        #         padding='same', activation=self.params['activation'], data_format="channels_last")(inOP)
-        # inOP = Dropout(0.75)(inOP)  
+        inOP = Conv2D(filters=int(self.params['nFilters2D']/2), kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
+                padding='same', activation=self.params['activation'], data_format="channels_last")(inOP)
+        inOP = Dropout(0.5)(inOP)
+
+        inOP = Conv2D(filters=int(self.params['nFilters2D']/2), kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], 
+                padding='same', activation=self.params['activation'], data_format="channels_last")(inOP)
+        inOP = Dropout(0.5)(inOP)
 
         ## Fluorescence Input Branch ##
         input_shape = inFL_beg.shape
         inFL = Conv3D(filters=self.params['nFilters3D']//2, kernel_size=self.params['kernelConv3D'], strides=self.params['strideConv3D'], 
                 padding='same', activation=self.params['activation'], input_shape=input_shape[1:], data_format="channels_last")(inFL_beg)
-        # inFL = Dropout(0.75)(inFL)
+        inFL = Dropout(0.5)(inFL)
 
         inFL = Conv3D(filters=int(self.params['nFilters3D']/2), kernel_size=self.params['kernelConv3D'], strides=self.params['strideConv3D'], 
                 padding='same', activation=self.params['activation'], data_format="channels_last")(inFL)
-        # inFL = Dropout(0.75)(inFL)
+        inFL = Dropout(0.5)(inFL)
+
         inFL = Conv3D(filters=int(self.params['nFilters3D']/2), kernel_size=self.params['kernelConv3D'], strides=self.params['strideConv3D'], 
                 padding='same', activation=self.params['activation'], data_format="channels_last")(inFL)
-        # inFL = Dropout(0.75)(inFL)
+        inFL = Dropout(0.5)(inFL)
 
         ## Concatenate Branch ##
         # inFL = Permute((2, 3, 1, 4))(inFL)
         inFL = Reshape((inFL.shape[1], inFL.shape[2], inFL.shape[3] * inFL.shape[4]))(inFL)
-        # concat = concatenate([inOP,inFL],axis=-1)
+        concat = concatenate([inOP,inFL],axis=-1)
 
-        Max_Pool_1 = MaxPool2D()(inFL)
+        Max_Pool_1 = MaxPool2D()(concat)
 
         Conv_1 = Conv2D(filters=256, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
                 activation=self.params['activation'], data_format="channels_last")(Max_Pool_1)
@@ -135,7 +149,7 @@ class ModelInit():
         Conv_5 = Conv2D(filters=256, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
                 activation=self.params['activation'], data_format="channels_last")(Conv_5)
         
-        long_path_3 = ZeroPadding2D(padding = ((1,0), (1,0)))(inFL)
+        long_path_3 = ZeroPadding2D(padding = ((1,0), (1,0)))(concat)
         Conv_5_zero_pad = ZeroPadding2D(padding = ((1,0), (1,0)))(Conv_5)
 
         attention_3 = self.build_attention_gate(long_path_3, Conv_5_zero_pad, 128)
@@ -151,46 +165,53 @@ class ModelInit():
 
         Conv_6 = Conv2D(filters=128, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
                 activation=self.params['activation'], data_format="channels_last")(concat_3)
-
-        ## Quantitative Fluorescence Output Branch ##
-        outQF = Conv2D(filters=64, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                activation=self.params['activation'], data_format="channels_last")(Conv_6)
-
-        outQF = Conv2D(filters=32, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                activation=self.params['activation'], data_format="channels_last")(outQF) #outQF
         
-        outQF = Conv2D(filters=1, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                        data_format="channels_last", name='outQF')(outQF)
+        # Quantitative Fluorescence head (QF)
+        qf = Conv2D(64, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'],
+                data_format="channels_last")(Conv_6)
+        qf = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'],
+                data_format="channels_last")(qf)
+        qf = Conv2D(1, (1, 1), (1, 1), padding='same', activation=None,
+                data_format="channels_last", name='outQF_logits')(qf)
+        outQF = keras.layers.Reshape((self.params['yY'], self.params['xX']), name='outQF')(qf)
 
-        ## Depth Fluorescence Output Branch ##
-        #first DF layer 
-        outDF = Conv2D(filters=64, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                activation=self.params['activation'], data_format="channels_last")(Conv_6)
-
-        outDF = Conv2D(filters=32, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                activation=self.params['activation'], data_format="channels_last")(outDF)
-        
-        outDF = Conv2D(filters=1, kernel_size=self.params['kernelConv2D'], strides=self.params['strideConv2D'], padding='same', 
-                data_format="channels_last", name='outDF')(outDF)
+        # Depth head (DF)
+        df = Conv2D(64, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'],
+                data_format="channels_last")(Conv_6)
+        df = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
+                padding='same', activation=self.params['activation'],
+                data_format="channels_last")(df)
+        df = Conv2D(1, (1, 1), (1, 1), padding='same', activation=None,
+                data_format="channels_last", name='outDF_logits')(df)
+        outDF = keras.layers.Reshape((self.params['yY'], self.params['xX']), name='outDF')(df)
 
         ## Defining and compiling the model ##
 
-        self.model = Model(inputs=[inFL_beg], outputs=[outQF, outDF])
+        self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outQF, outDF])
 
         self.model.compile(
-            loss={'outQF': 'mae', 'outDF': 'mae'},
-            optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
-            metrics={
+        loss={'outQF': 'mae', 'outDF': 'mae'},
+        optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
+        metrics={
                 'outQF': metrics.MeanAbsoluteError(name='mae_qf'),
-                'outDF': [metrics.MeanAbsoluteError(name='mae_df'), tumor_mae]
-            }
+                'outDF': [metrics.MeanAbsoluteError(name='mae_df'),
+                        TumorMAE(depth_padding=self.params['depth_padding'])]
+        }
         )
-        
+
         # self.model.summary()
 
         return None
     
     def load_model(self, model_path):
-        self.model = tf.keras.models.load_model(model_path)
+        self.model = load_model(model_path)
+
+        return None
+    
+    def save_model(self, model_path):
+        self.model.save(model_path)
 
         return None

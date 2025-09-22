@@ -3,11 +3,13 @@ from datetime import datetime
 
 role = 'arn:aws:iam::425873948573:role/service-role/AmazonSageMaker-ExecutionRole-20220524T140113'
 
+
+model_name = "model_hikaru_dropout"
 seed = 1024
-train_subset = 1000
+train_subset = 8000
 activation = "relu"
 optimizer = "Adam"
-epochs = 1
+epochs = 100
 nF = 6
 learningRate = 5e-4
 batch = 32
@@ -15,7 +17,7 @@ xX = 101
 yY = 101
 decayRate = 0.4
 depth_padding = 10
-normalize = 1
+normalize = 0
 fx_idx = "0 1 2 3 4 5"
 
 scaleFL = 10e4
@@ -45,6 +47,7 @@ estimator = TensorFlow(
     script_mode=True,
     dependencies=['requirements.txt'],
     hyperparameters= {
+        "model_name": model_name,
         "seed": seed,
         "sagemaker": True,
         "train_subset": train_subset,
@@ -78,7 +81,7 @@ estimator = TensorFlow(
 )
 # job_name = f'vvv-tfTrain-{train_subset}-{seed}-{"_".join(data_path.split(".")[0].split("_")[:2])}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 # job_name = job_name.replace("_", "-")
-job_name = "vvvv-test-model-hikaru-mod-morning3"
+job_name = "vvvv-test-model-hikaru-original-dropout-1"
 inputs = {
     'training': f's3://{bucket_name}/python_training_data_sim/{data_path}',
 }

@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from model.model_hikaru import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime
@@ -38,6 +37,7 @@ def get_arg_parser():
     parser = argparse.ArgumentParser(description="Hyperparameter configuration for fluorescence imaging model.")
 
     parser.add_argument('--sagemaker', type=bool, default=False, help='SageMaker mode')
+    parser.add_argument('--model_name', type=str, default='model_hikaru', help='Model name')
     parser.add_argument('--train_subset', type=int, default=8000, help='Train subset')
     parser.add_argument('--seed', type=int, default=1024, help='Seed')
 
@@ -221,6 +221,13 @@ def train(params):
     print("Train dataset shape:", train_dataset.element_spec)
     print("Val dataset shape:", val_dataset.element_spec)
     print("Test dataset shape:", test_dataset.element_spec)
+
+    if params['model_name'] == 'model_hikaru_dropout':
+        from model.model_hikaru_dropout import ModelInit
+    elif params['model_name'] == 'model_hikaru':
+        from model.model_hikaru import ModelInit
+    elif params['model_name'] == 'model_shape':
+        from model.model_shape import ModelInit
 
     # Initialize model
     model = ModelInit(params)

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from model.model_shape import ModelInit
+from model.model_hikaru import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime
