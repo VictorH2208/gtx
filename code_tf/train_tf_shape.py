@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 import argparse
 import numpy as np
-from model.model_hikaru import ModelInit
+from model.model_shape import ModelInit
 from tqdm import tqdm
 import tensorflow as tf
 from datetime import datetime
@@ -38,6 +38,7 @@ def get_arg_parser():
     parser = argparse.ArgumentParser(description="Hyperparameter configuration for fluorescence imaging model.")
 
     parser.add_argument('--sagemaker', type=bool, default=False, help='SageMaker mode')
+    parser.add_argument('--model_name', type=str, default='model_hikaru', help='Model name')
     parser.add_argument('--train_subset', type=int, default=8000, help='Train subset')
     parser.add_argument('--seed', type=int, default=1024, help='Seed')
 
@@ -52,8 +53,9 @@ def get_arg_parser():
     parser.add_argument('--yY', type=int, default=101, help='Image height')
     parser.add_argument('--decayRate', type=float, default=0.3, help='Learning rate decay factor')
     parser.add_argument('--patience', type=int, default=20, help='Early stopping patience')
-    parser.add_argument('--normalize', type=bool, default=False, help='Normalize data')
-
+    parser.add_argument('--normalize', type=int, default=0, help='Normalize data')
+    parser.add_argument('--depth_padding', type=int, default=0, help='Depth padding')
+    parser.add_argument('--fx_idx', type=int, nargs=6, default=[0, 1, 2, 3, 4, 5])
     # Scaling parameters
     parser.add_argument('--scaleFL', type=float, default=10e4, help='Scaling factor for fluorescence')
     parser.add_argument('--scaleOP0', type=float, default=10, help='Scaling for absorption coefficient (μa)')
@@ -76,7 +78,7 @@ def get_arg_parser():
     parser.add_argument('--data_path', type=str, default='../data/ts_2d_10000.mat')
     parser.add_argument('--model_dir', type=str, default='../code_tf/aws_ckpt/')
     return parser
-
+    
 class BatchLogger(callbacks.Callback):
     def __init__(self, log_interval=50, num_samples=None, batch_size=None):
         super().__init__()
@@ -138,17 +140,15 @@ def train(params):
         filepath = os.path.join('../data', params['data_path'])
         data = load_data(filepath, scale_params, params['seed'], params['normalize'])
 
-    train_data = data['train']
+    train_data = data['train'].copy()
     train_fluorescence = train_data['fluorescence']
+    train_fluorescence = train_fluorescence[...,params['fx_idx']]
     # train_fluorescence = np.transpose(train_fluorescence, (0, 3, 1, 2))
     train_fluorescence = np.expand_dims(train_fluorescence, axis=-1)
     train_op = np.stack([train_data['mu_a'], train_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     train_depth = train_data['depth']
-    train_depth[train_depth == 0] = 0
-    train_shape = (train_depth > 0).astype(np.float32)[..., np.newaxis]
-    train_concentration_fluor = train_data['concentration_fluor']
-    # train_concentration_fluor = train_mask
-    train_reflectance = train_data['reflectance']
+    train_shape = train_data['depth'].copy()
+    train_shape[train_shape != 0] = 1
 
     N = train_fluorescence.shape[0]
     if params['train_subset'] and 0 < params['train_subset'] < N:
@@ -158,61 +158,41 @@ def train(params):
         train_op                  = train_op[idx]
         train_depth               = train_depth[idx]
         train_shape               = train_shape[idx]
-        train_concentration_fluor = train_concentration_fluor[idx]
-        train_reflectance         = train_reflectance[idx]
 
     train_dataset = tf.data.Dataset.from_tensor_slices((
         (train_op, train_fluorescence),  # tuple of inputs
         {'outDF': train_depth, 'outShape': train_shape}  # dict of outputs
     ))
-    # train_dataset = tf.data.Dataset.from_tensor_slices((
-    #     (train_op, train_fluorescence),  # tuple of inputs
-    #     {'outQF': train_concentration_fluor, 'outDF': train_depth, 'outReflect': train_reflectance}  # dict of outputs
-    # ))
     train_dataset = train_dataset.shuffle(buffer_size=1000, seed=1024, reshuffle_each_iteration=False).batch(params['batch'])
 
-    val_data = data['val']
+    val_data = data['val'].copy()
     val_fluorescence = val_data['fluorescence']
-    # val_fluorescence = np.transpose(val_fluorescence, (0, 3, 1, 2))
+    val_fluorescence = val_fluorescence[...,params['fx_idx']]
     val_fluorescence = np.expand_dims(val_fluorescence, axis=-1)
     val_op = np.stack([val_data['mu_a'], val_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     val_depth = val_data['depth']
-    val_depth[val_depth == 0] = 0
-    val_shape = (val_depth > 0).astype(np.float32)[..., np.newaxis]
-    val_concentration_fluor = val_data['concentration_fluor']
-    # val_concentration_fluor = val_mask
-    val_reflectance = val_data['reflectance']
+    val_shape = val_data['depth'].copy()
+    val_shape[val_shape != 0] = 1
 
     val_dataset = tf.data.Dataset.from_tensor_slices((
         (val_op, val_fluorescence),  # tuple of inputs
         {'outDF': val_depth, 'outShape': val_shape}  # dict of outputs
     ))
-    # val_dataset = tf.data.Dataset.from_tensor_slices((
-    #     (val_op, val_fluorescence),  # tuple of inputs
-    #     {'outQF': val_concentration_fluor, 'outDF': val_depth, 'outReflect': val_reflectance}  # dict of outputs
-    # ))
     val_dataset = val_dataset.batch(params['batch'])
 
-    test_data = data['test']
+    test_data = data['test'].copy()
     test_fluorescence = test_data['fluorescence']
-    # test_fluorescence = np.transpose(test_fluorescence, (0, 3, 1, 2))
+    test_fluorescence = test_fluorescence[...,params['fx_idx']]
     test_fluorescence = np.expand_dims(test_fluorescence, axis=-1)
     test_op = np.stack([test_data['mu_a'], test_data['mu_s']], axis=1).transpose(0, 2, 3, 1)
     test_depth = test_data['depth']
-    test_depth[test_depth == 0] = 0
-    test_shape = (test_depth > 0).astype(np.float32)[..., np.newaxis]
-    test_concentration_fluor = test_data['concentration_fluor']
-    # test_concentration_fluor = test_mask
-    test_reflectance = test_data['reflectance']
+    test_shape = test_data['depth'].copy()
+    test_shape[test_shape != 0] = 1
 
     test_dataset = tf.data.Dataset.from_tensor_slices((
         (test_op, test_fluorescence),  # tuple of inputs
         {'outDF': test_depth, 'outShape': test_shape}  # dict of outputs
     ))
-    # test_dataset = tf.data.Dataset.from_tensor_slices((
-    #     (test_op, test_fluorescence),  # tuple of inputs
-    #     {'outQF': test_concentration_fluor, 'outDF': test_depth, 'outReflect': test_reflectance}  # dict of outputs
-    # ))
     test_dataset = test_dataset.batch(params['batch'])
 
     print("Train dataset shape:", train_dataset.element_spec)

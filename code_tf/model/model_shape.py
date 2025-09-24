@@ -7,31 +7,75 @@ from keras import metrics
 import keras.backend as K
 from keras.saving import register_keras_serializable
 
-@register_keras_serializable(package="metrics_losses", name="tumor_mae")
-def tumor_mae(y_true, y_pred):
-    mask = tf.not_equal(y_true, 0.0)
-    err  = tf.abs(y_true - y_pred)
-    masked_err = tf.boolean_mask(err, mask)
-    return tf.cond(
-        tf.size(masked_err) > 0,
-        lambda: tf.reduce_mean(masked_err),
-        lambda: tf.constant(0.0)
-    )
+@register_keras_serializable(package="metrics_losses")
+class maeloss(tf.keras.losses.Loss):
+    def __init__(self, depth_padding=0.0, name="tumor_mae_loss", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.depth_padding = depth_padding
+
+    def call(self, y_true, y_pred):
+        mask = tf.not_equal(y_true, self.depth_padding)
+        err  = tf.abs(y_true - y_pred)
+        masked_err = tf.boolean_mask(err, mask)
+        return tf.cond(
+            tf.size(masked_err) > 0,
+            lambda: tf.reduce_mean(masked_err),
+            lambda: tf.constant(0.0)
+        )
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "depth_padding": self.depth_padding,
+        })
+        return config
 
 
-@register_keras_serializable(package="metrics_losses", name="weighted_bce")
-def weighted_bce(y_true, y_pred, pos_weight=5.0):
-    print("weighted_bce")
-    print(y_true.shape, y_pred.shape)
-    per_pixel_bce = tf.keras.losses.binary_crossentropy(
-        y_true, y_pred, from_logits=False
-    )     
 
-    weights = tf.where(tf.equal(y_true, 1.0),
-                       tf.cast(pos_weight, per_pixel_bce.dtype),
-                       tf.cast(1.0, per_pixel_bce.dtype))         # -> (B, H, W)
+@register_keras_serializable(package="metrics_losses")
+class diceloss(tf.keras.losses.Loss):
+    def __init__(self, smooth=1e-7, name="dice_loss", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.smooth = smooth
 
-    return tf.reduce_mean(per_pixel_bce * weights)    
+    def call(self, y_true, y_pred):
+        y_true_f = tf.reshape(y_true, [-1])
+        y_pred_f = tf.reshape(y_pred, [-1])
+        intersection = tf.reduce_sum(y_true_f * y_pred_f)
+        dice = (2. * intersection + self.smooth) / (
+            tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + self.smooth
+        )
+        return 1.0 - dice
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "smooth": self.smooth,
+        })
+        return config
+
+@register_keras_serializable(package="metrics_losses")
+class TumorMAE(tf.keras.metrics.Metric):
+    def __init__(self, depth_padding=0.0, name="tumor_mae", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.depth_padding = depth_padding
+        self.total = self.add_weight(name="total", initializer="zeros")
+        self.count = self.add_weight(name="count", initializer="zeros")
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        mask = tf.not_equal(y_true, self.depth_padding)
+        err  = tf.abs(y_true - y_pred)
+        masked_err = tf.boolean_mask(err, mask)
+        value = tf.cond(
+            tf.size(masked_err) > 0,
+            lambda: tf.reduce_mean(masked_err),
+            lambda: tf.constant(0.0)
+        )
+        self.total.assign_add(value)
+        self.count.assign_add(1.0)
+
+    def result(self):
+        return self.total / self.count
 
 
 class ModelInit():  
@@ -175,8 +219,10 @@ class ModelInit():
         shape = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
                 padding='same', activation=self.params['activation'])(shape)
         shape = Conv2D(1, (1, 1), (1, 1), padding='same',
-               activation='None',  # binary output
+               activation=None,  # binary output
                name='shape_logits')(shape)
+        outShape = keras.layers.Reshape((self.params['yY'], self.params['xX']),
+                                name='outShape')(shape)
 
         # Depth head (DF)
         df = Conv2D(64, self.params['kernelConv2D'], self.params['strideConv2D'],
@@ -197,15 +243,16 @@ class ModelInit():
 
         self.model.compile(
                 loss={
-                        'outShape': weighted_bce,
-                        'outDF': tumor_mae
+                        'outShape': diceloss(),
+                        'outDF': maeloss()
                 },
+                loss_weights={'outShape': 4.0, 'outDF': 1.0},
                 optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
                 metrics={
                         'outShape': [metrics.BinaryAccuracy(name='acc_shape'),
                                 metrics.Precision(name='prec_shape'),
                                 metrics.Recall(name='rec_shape')],
-                        'outDF': [tumor_mae]
+                        'outDF': [TumorMAE()]
                 }
         )
         
