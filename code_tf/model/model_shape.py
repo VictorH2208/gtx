@@ -55,6 +55,57 @@ class diceloss(tf.keras.losses.Loss):
         return config
 
 @register_keras_serializable(package="metrics_losses")
+class focalBCEDice(tf.keras.losses.Loss):
+    def __init__(self, smooth=1e-7, alpha=0.25, gamma=2.0,
+                 dice_weight=0.5, name="focal_bce_dice_loss", **kwargs):
+        """
+        Focal BCE + Dice Loss
+        alpha: class weight (higher -> more weight on positive class)
+        gamma: focusing parameter (higher -> focus more on hard pixels)
+        dice_weight: relative weight of Dice loss vs focal BCE
+        """
+        super().__init__(name=name, **kwargs)
+        self.smooth = smooth
+        self.alpha = alpha
+        self.gamma = gamma
+        self.dice_weight = dice_weight
+
+    def call(self, y_true, y_pred):
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred = tf.cast(y_pred, tf.float32)
+        y_pred = tf.clip_by_value(y_pred, 1e-7, 1.0 - 1e-7)
+
+        # --- BCE (manual, pixel-wise) ---
+        bce = -(y_true * tf.math.log(y_pred) +
+                (1 - y_true) * tf.math.log(1 - y_pred))
+
+        # --- Focal modulation ---
+        p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
+        focal_bce = self.alpha * tf.pow((1 - p_t), self.gamma) * bce
+        focal_bce = tf.reduce_mean(focal_bce)
+
+        # --- Dice ---
+        y_true_f = tf.reshape(y_true, [-1])
+        y_pred_f = tf.reshape(y_pred, [-1])
+        intersection = tf.reduce_sum(y_true_f * y_pred_f)
+        dice = (2. * intersection + self.smooth) / (
+            tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + self.smooth
+        )
+        dice_loss = 1.0 - dice
+
+        return (1 - self.dice_weight) * focal_bce + self.dice_weight * dice_loss
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "smooth": self.smooth,
+            "alpha": self.alpha,
+            "gamma": self.gamma,
+            "dice_weight": self.dice_weight,
+        })
+        return config
+
+@register_keras_serializable(package="metrics_losses")
 class TumorMAE(tf.keras.metrics.Metric):
     def __init__(self, depth_padding=0.0, name="tumor_mae", **kwargs):
         super().__init__(name=name, **kwargs)
@@ -219,7 +270,7 @@ class ModelInit():
         shape = Conv2D(32, self.params['kernelConv2D'], self.params['strideConv2D'],
                 padding='same', activation=self.params['activation'])(shape)
         shape = Conv2D(1, (1, 1), (1, 1), padding='same',
-               activation=None,  # binary output
+               activation='sigmoid',  # binary output
                name='shape_logits')(shape)
         outShape = keras.layers.Reshape((self.params['yY'], self.params['xX']),
                                 name='outShape')(shape)
@@ -242,18 +293,20 @@ class ModelInit():
         self.model = Model(inputs=[inOP_beg, inFL_beg], outputs=[outShape, outDF])
 
         self.model.compile(
-                loss={
-                        'outShape': diceloss(),
-                        'outDF': maeloss()
-                },
-                loss_weights={'outShape': 4.0, 'outDF': 1.0},
-                optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
-                metrics={
-                        'outShape': [metrics.BinaryAccuracy(name='acc_shape'),
-                                metrics.Precision(name='prec_shape'),
-                                metrics.Recall(name='rec_shape')],
-                        'outDF': [TumorMAE()]
-                }
+            loss={
+                'outShape': focalBCEDice(alpha=0.25, gamma=2.0, dice_weight=0.5),  # <- hybrid loss
+                'outDF': maeloss()
+            },
+            loss_weights={'outShape': 5.0, 'outDF': 1.0},
+            optimizer=getattr(tf.keras.optimizers, self.params['optimizer'])(learning_rate=self.params['learningRate']),
+            metrics={
+                'outShape': [
+                    metrics.BinaryAccuracy(name='acc_shape'),
+                    metrics.Precision(name='prec_shape'),
+                    metrics.Recall(name='rec_shape')
+                ],
+                'outDF': [TumorMAE()]
+            }
         )
         
         # self.model.summary()
