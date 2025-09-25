@@ -33,7 +33,7 @@ nFilters2D = 128
 kernelConv2D = "3 3"
 strideConv2D = "1 1"
 
-data_path = "padded_mcx_10000_single.mat" # <--- Change this if you want to use a different dataset
+data_path = "ts_3d_10000_original_noTBR.mat" # <--- Change this if you want to use a different dataset
 bucket_name = "20250509-victor" # <--- Change this to your own bucket
 
 estimator = TensorFlow(
