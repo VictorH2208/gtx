@@ -4,7 +4,7 @@ from datetime import datetime
 role = 'arn:aws:iam::425873948573:role/service-role/AmazonSageMaker-ExecutionRole-20220524T140113'
 
 
-model_name = "model_hikaru_dropout"
+model_name = "model_hikaru"
 seed = 1024
 train_subset = 8000
 activation = "relu"
@@ -17,7 +17,7 @@ xX = 101
 yY = 101
 decayRate = 0.4
 depth_padding = 10
-normalize = 1
+normalize = 0
 fx_idx = "0 1 2 3 4 5"
 
 scaleFL = 10e4
@@ -33,7 +33,7 @@ nFilters2D = 128
 kernelConv2D = "3 3"
 strideConv2D = "1 1"
 
-data_path = "ts_2d_10000_original_TBR.mat" # <--- Change this if you want to use a different dataset
+data_path = "padded_mcx_10000_single.mat" # <--- Change this if you want to use a different dataset
 bucket_name = "20250509-victor" # <--- Change this to your own bucket
 
 estimator = TensorFlow(
