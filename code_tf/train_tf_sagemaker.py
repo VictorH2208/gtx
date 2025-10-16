@@ -4,7 +4,7 @@ from datetime import datetime
 role = 'arn:aws:iam::425873948573:role/service-role/AmazonSageMaker-ExecutionRole-20220524T140113'
 
 
-model_name = "model_shape_1"
+model_name = "model_hikaru_dropout"
 seed = 1024
 train_subset = 8000
 activation = "relu"
@@ -17,10 +17,10 @@ xX = 101
 yY = 101
 decayRate = 0.4
 depth_padding = 10
-normalize = 1
+normalize = 0
 fx_idx = "0 1 2 3 4 5"
 
-scaleFL = 10e4
+scaleFL = 10e3
 scaleOP0 = 10
 scaleOP1 = 1
 scaleDF = 1
@@ -37,7 +37,7 @@ data_path = "ts_2d_10000_original_TBR.mat" # <--- Change this if you want to use
 bucket_name = "20250509-victor" # <--- Change this to your own bucket
 
 estimator = TensorFlow(
-    entry_point='train_tf_shape.py',     # Entry script
+    entry_point='train_tf.py',     # Entry script
     source_dir='.',                   # This is the key: run from `code_tf/`
     role=role,
     instance_count=1,
@@ -79,7 +79,7 @@ estimator = TensorFlow(
     },
     output_path=f's3://{bucket_name}/tf_training_output/' # <--- Change this to your own bucket and output path
 )
-job_name = f'vvv-shn-{train_subset}-{seed}-{"_".join(data_path.split(".")[0].split("_")[:2])}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+job_name = f'vvv-1-{train_subset}-{seed}-{"_".join(data_path.split(".")[0].split("_")[:2])}-{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 job_name = job_name.replace("_", "-")
 inputs = {
     'training': f's3://{bucket_name}/python_training_data_sim/{data_path}',
